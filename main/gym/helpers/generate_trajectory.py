@@ -1,7 +1,7 @@
 import gym
 import numpy as np
 
-from RL4MM.agents.Agent import Agent
+from main.agents.Agent import Agent
 
 
 def generate_trajectory(env: gym.Env, agent: Agent, seed: int = None):
@@ -20,4 +20,4 @@ def generate_trajectory(env: gym.Env, agent: Agent, seed: int = None):
         rewards.append(reward)
         if done:
             break
-    return observations, actions, rewards
+    return np.array(observations), np.array(actions), np.array(rewards)

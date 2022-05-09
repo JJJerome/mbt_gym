@@ -5,8 +5,8 @@ from copy import deepcopy
 from gym.spaces import Box
 from math import sqrt, isclose
 
-from RL4MM.gym.models import Action
-from RL4MM.rewards.RewardFunctions import RewardFunction, PnL
+from main.gym.models import Action
+from main.rewards.RewardFunctions import RewardFunction, PnL
 
 
 class AvellanedaStoikovEnvironment(gym.Env):

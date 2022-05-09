@@ -3,15 +3,13 @@ import abc
 import numpy as np
 
 from pydantic import NonNegativeFloat, PositiveFloat
-
-from RL4MM.base import State
-from RL4MM.gym.models import Action
+from main.gym.models import Action
 
 
 class RewardFunction(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def calculate(
-        self, current_state: State, action: Action, next_state: State, is_terminal_step: bool = False
+        self, current_state: np.ndarray, action: Action, next_state: np.ndarray, is_terminal_step: bool = False
     ) -> float:
         pass
 
@@ -30,7 +28,7 @@ class TerminalExponentialUtility(RewardFunction):
         self.risk_aversion = risk_aversion
 
     def calculate(
-        self, current_state: State, action: Action, next_state: State, is_terminal_step: bool = False
+        self, current_state: np.ndarray, action: Action, next_state: np.ndarray, is_terminal_step: bool = False
     ) -> float:
         return -np.exp(-self.risk_aversion * (next_state[1] + next_state[0] * next_state[2])) if is_terminal_step else 0
 

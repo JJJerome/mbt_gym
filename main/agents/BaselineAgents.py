@@ -2,9 +2,8 @@ import gym
 
 import numpy as np
 
-from RL4MM.agents.Agent import Agent
-from RL4MM.base import State
-from RL4MM.gym.models import Action
+from main.agents.Agent import Agent
+from main.gym.models import Action
 
 
 class RandomAgent(Agent):
@@ -12,7 +11,7 @@ class RandomAgent(Agent):
         self.action_space = action_space
         self.action_space.seed(seed)
 
-    def get_action(self, state: State) -> Action:
+    def get_action(self, state: np.ndarray) -> Action:
         return self.action_space.sample()
 
 
@@ -21,7 +20,7 @@ class FixedSpreadAgent(Agent):
         self.half_spread = half_spread
         self.offset = offset
 
-    def get_action(self, state: State) -> Action:
+    def get_action(self, state: np.ndarray) -> Action:
         return Action(bid=self.half_spread - self.offset, ask=self.half_spread + self.offset)
 
 

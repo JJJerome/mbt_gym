@@ -3,7 +3,7 @@ import warnings
 
 from pydantic import NonNegativeFloat, PositiveInt
 
-from RL4MM.agents.Agent import Agent
+from main.agents.Agent import Agent
 
 
 class AvellanedaStoikovAgent(Agent):

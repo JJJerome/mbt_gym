@@ -1,10 +1,10 @@
 import numpy as np
 
-from RL4MM.agents.Agent import Agent
+from main.agents.Agent import Agent
 
 from stable_baselines3.common.base_class import BaseAlgorithm
 
-from RL4MM.gym.models import Action
+from main.gym.models import Action
 
 
 class SBAgent(Agent):

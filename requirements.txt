@@ -6,3 +6,4 @@ pydantic==1.9.0
 seaborn==0.11.2
 stable_baselines3==1.5.0
 stochastic==0.6.0
+tensorboard

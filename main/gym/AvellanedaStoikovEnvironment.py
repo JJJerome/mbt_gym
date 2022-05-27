@@ -6,7 +6,7 @@ from gym.spaces import Box
 from math import sqrt, isclose
 
 from main.gym.models import Action
-from main.rewards.RewardFunctions import RewardFunction, PnL
+from main.rewards.RewardFunctions import RewardFunction, PnL, CJ_criterion
 
 
 class AvellanedaStoikovEnvironment(gym.Env):
@@ -15,17 +15,17 @@ class AvellanedaStoikovEnvironment(gym.Env):
     def __init__(
         self,
         terminal_time: float = 1.0,
-        n_steps: int = 200,
+        n_steps: int = 100,
         reward_function: RewardFunction = None,
         drift: float = 0.0,
-        volatility: float = 2.0,
-        arrival_rate: float = 140.0,
+        volatility: float = 1.0,
+        arrival_rate: float = 50.0,
         fill_exponent: float = 1.5,
         max_inventory: int = 100,
         max_cash: float = None,
         max_stock_price: float = None,
-        max_half_spread: float = 10,
-        initial_cash: float = 100.0,
+        max_half_spread: float = 4.0,
+        initial_cash: float = 0.0,
         initial_inventory: int = 0,
         initial_stock_price: float = 100.0,
         continuous_observation_space: bool = True,  # This permits us to use out of the box algos from Stable-baselines
@@ -34,14 +34,14 @@ class AvellanedaStoikovEnvironment(gym.Env):
         super(AvellanedaStoikovEnvironment, self).__init__()
         self.terminal_time = terminal_time
         self.n_steps = n_steps
-        self.reward_function = reward_function or PnL()
+        self.reward_function = reward_function or CJ_criterion() #PnL()
         self.drift = drift
         self.volatility = volatility
         self.arrival_rate = arrival_rate
         self.fill_exponent = fill_exponent
         self.max_inventory = max_inventory
-        self.max_cash = max_cash or initial_cash * 100
-        self.max_stock_price = max_stock_price or initial_stock_price * 100
+        self.max_cash = max_cash or initial_cash + arrival_rate*initial_stock_price*5.0 # It was times before
+        self.max_stock_price = max_stock_price or initial_stock_price * 2.0 #100
         self.max_half_spread = max_half_spread
         self.initial_cash = initial_cash
         self.initial_inventory = initial_inventory
@@ -51,7 +51,11 @@ class AvellanedaStoikovEnvironment(gym.Env):
         self.dt = self.terminal_time / self.n_steps
         self.max_inventory_exceeded_penalty = self.initial_stock_price * self.volatility * self.dt * 10
 
-        self.action_space = Box(low=0.0, high=self.max_half_spread, shape=(2,))  # agent chooses spread on bid and ask
+        self.action_space = Box(
+            low=0.0, 
+            high=self.max_half_spread, 
+            shape=(2,)
+            )  # agent chooses spread on bid and ask
         # observation space is (stock price, cash, inventory, step_number)
         self.observation_space = Box(
             low=np.array([0, -self.max_cash, -self.max_inventory, 0]),
@@ -75,7 +79,8 @@ class AvellanedaStoikovEnvironment(gym.Env):
 
     def render(self, mode="human"):
         pass
-
+    
+    # state[0]=stock_price, state[1]=cash, state[2]=inventory, state[3]=time
     def _get_next_state(self, action: Action) -> np.ndarray:
         action = Action(*action)  # for SB learning algo
         next_state = deepcopy(self.state)
@@ -87,14 +92,14 @@ class AvellanedaStoikovEnvironment(gym.Env):
             pass
         if unif_bid < fill_prob_bid and unif_ask > fill_prob_ask:  # only bid filled
             # Note that market order gets filled THEN asset midprice changes
-            next_state[1] -= self.state[0] - action.bid
+            next_state[1] -= (self.state[0] - action.bid)
             next_state[2] += 1
         if unif_bid > fill_prob_bid and unif_ask < fill_prob_ask:  # only ask filled
-            next_state[1] += self.state[0] + action.ask
+            next_state[1] += (self.state[0] + action.ask)
             next_state[2] -= 1
         if unif_bid < fill_prob_bid and unif_ask < fill_prob_ask:  # both bid and ask filled
             next_state[1] += action.bid + action.ask
         return next_state
 
     def fill_prob(self, half_spread: float) -> float:
-        return min(self.arrival_rate * np.exp(-self.fill_exponent * half_spread) * self.dt, 1)
+        return min( (1.0 - np.exp(-self.arrival_rate*self.dt)) * np.exp(-self.fill_exponent * half_spread) , 1)

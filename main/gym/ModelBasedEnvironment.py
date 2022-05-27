@@ -30,9 +30,9 @@ class ModelBasedEnvironment(gym.Env):
         arrival_model: ArrivalModel = None,
         fill_probability_function: FillProbabilityFunction = None,
         reward_function: RewardFunction = None,
-        initial_cash: float = 1000,
+        initial_cash: float = 0.0,
         initial_inventory: int = 0,
-        max_inventory: int = 20,
+        max_inventory: int = 100,
         seed: int = None,
     ):
         super(ModelBasedEnvironment, self).__init__()

@@ -2,7 +2,7 @@ import abc
 
 import numpy as np
 
-from main.gym.models import Action
+from DRL4AMM.gym.models import Action
 
 
 class Agent(metaclass=abc.ABCMeta):

@@ -1,7 +1,7 @@
 from invoke import task
 
 
-MODULES_TO_CHECK = ["main", "*.py"]
+MODULES_TO_CHECK = ["DRL4AMM", "*.py"]
 MODULES_TO_CHECK_STR = " ".join(MODULES_TO_CHECK)
 BLACK_PATHS_TO_IGNORE = []
 BLACK_PATHS_TO_IGNORE_STR = " ".join(BLACK_PATHS_TO_IGNORE)

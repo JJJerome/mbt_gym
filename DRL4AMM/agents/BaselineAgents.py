@@ -2,8 +2,8 @@ import gym
 
 import numpy as np
 
-from main.agents.Agent import Agent
-from main.gym.models import Action
+from DRL4AMM.agents.Agent import Agent
+from DRL4AMM.gym.models import Action
 
 
 class RandomAgent(Agent):

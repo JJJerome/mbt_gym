@@ -7,9 +7,9 @@ from copy import deepcopy
 from gym.spaces import Box
 from math import isclose
 
-from main.gym.models import Action
-from main.rewards.RewardFunctions import RewardFunction, PnL
-from main.gym.probability_models import (
+from DRL4AMM.gym.models import Action
+from DRL4AMM.rewards.RewardFunctions import RewardFunction, PnL
+from DRL4AMM.gym.probability_models import (
     MidpriceModel,
     StochasticMidpriceModel,
     FillProbabilityFunction,

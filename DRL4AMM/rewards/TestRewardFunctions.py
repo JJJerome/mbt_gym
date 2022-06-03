@@ -2,7 +2,7 @@ from unittest import TestCase, main
 
 import numpy as np
 
-from main.rewards.RewardFunctions import InventoryAdjustedPnL, PnL
+from DRL4AMM.rewards.RewardFunctions import InventoryAdjustedPnL, PnL
 
 STEP_SIZE = 0.1
 TEST_CURRENT_STATE = np.array([100, 120, 2, 0.5])

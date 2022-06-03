@@ -1,7 +1,7 @@
 import gym
 import numpy as np
 
-from main.agents.Agent import Agent
+from DRL4AMM.agents.Agent import Agent
 
 
 def generate_trajectory(env: gym.Env, agent: Agent, seed: int = None):

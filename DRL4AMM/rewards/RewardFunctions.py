@@ -4,7 +4,7 @@ from multiprocessing.context import assert_spawning
 import numpy as np
 
 from pydantic import NonNegativeFloat, PositiveFloat
-from main.gym.models import Action
+from DRL4AMM.gym.models import Action
 
 
 class RewardFunction(metaclass=abc.ABCMeta):

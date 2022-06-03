@@ -5,8 +5,8 @@ import pandas as pd
 
 import seaborn as sns
 
-from main.agents.Agent import Agent
-from main.gym.helpers.generate_trajectory import generate_trajectory
+from DRL4AMM.agents.Agent import Agent
+from DRL4AMM.gym.helpers.generate_trajectory import generate_trajectory
 
 
 def plot_as_trajectory(env: gym.Env, agent: Agent, seed: int = None):

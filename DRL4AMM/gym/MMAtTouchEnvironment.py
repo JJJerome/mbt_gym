@@ -21,6 +21,7 @@ class MMAtTouchEnvironment(gym.Env):
         volatility: float = 1.0,
         arrival_rate: float = 50.0,
         half_spread: float = 0.01,
+        mean_jump_size: float,
         max_inventory: int = 100,
         max_cash: float = None,
         max_stock_price: float = None,
@@ -38,6 +39,7 @@ class MMAtTouchEnvironment(gym.Env):
         self.volatility = volatility
         self.arrival_rate = arrival_rate
         self.half_spread = half_spread
+        self.mean_jump_size = mean_jump_size
         self.max_inventory = max_inventory
         self.max_cash = max_cash or initial_cash + arrival_rate * initial_stock_price * 5.0
         self.max_stock_price = max_stock_price or initial_stock_price * 2.0  # 100
@@ -77,23 +79,39 @@ class MMAtTouchEnvironment(gym.Env):
     def _get_next_state(self, action: Action) -> np.ndarray:
         action = Action(*action)
         next_state = deepcopy(self.state)
-        next_state[0] += self.drift * self.dt + self.volatility * sqrt(self.dt) * self.rng.normal()
         next_state[3] += self.dt
-        fill_prob_bid, fill_prob_ask = self.fill_prob(action.bid), self.fill_prob(action.ask)
         unif_bid, unif_ask = self.rng.random(2)
-        if unif_bid > fill_prob_bid and unif_ask > fill_prob_ask:  # neither the agent's bid nor their ask is filled
-            pass
-        if unif_bid < fill_prob_bid and unif_ask > fill_prob_ask:  # only bid filled
-            # Note that market order gets filled THEN asset midprice changes
-            next_state[1] -= self.state[0] - self.half_spread * action.bid
-            next_state[2] += 1
-        if unif_bid > fill_prob_bid and unif_ask < fill_prob_ask:  # only ask filled
-            next_state[1] += self.state[0] + self.half_spread * action.ask
-            next_state[2] -= 1
-        if unif_bid < fill_prob_bid and unif_ask < fill_prob_ask:  # both bid and ask filled
-            next_state[1] += self.half_spread * (action.bid + action.ask)
+        bid_arrival = True if unif_bid < self.arrival_prob else False
+        ask_arrival = True if unif_ask < self.arrival_prob else False  # TODO: add asymmetric order flow
+        if bid_arrival:
+            if action.bid:
+                next_state[1] -= self.state[0] - self.half_spread * action.bid
+                next_state[2] += 1
+        if ask_arrival:
+            if action.ask:
+                next_state[1] += self.state[0] + self.half_spread * action.ask
+                next_state[2] -= 1
+        next_state[0] = self.get_next_asset_price()
         return next_state
+
+    def get_next_asset_price(self):
+        return self.state[0] + self.drift * self.dt + self.volatility * sqrt(self.dt) * self.rng.normal()
+
+    def get_next_asset_price_pure_jump(self, bid_arrival:bool, ask_arrival:bool):
+        # Midprice model driven purely by posson arrivals
+        next_price = self.state[0]
+        if bid_arrival:
+            next_price += 2 * self.mean_jump_size - self.rng.random()
+        if ask_arrival:
+            next_price -= 2 * self.mean_jump_size - self.rng.random()
+        return next_price
+
 
     def fill_prob(self, action: float) -> float:
         prob_market_arrival = 1.0 - np.exp(-self.arrival_rate * self.dt)
         return prob_market_arrival * action
+
+    @property
+    def arrival_prob(self):
+        return 1.0 - np.exp(-self.arrival_rate * self.dt)
+

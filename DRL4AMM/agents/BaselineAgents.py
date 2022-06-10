@@ -15,6 +15,14 @@ class RandomAgent(Agent):
         return self.action_space.sample()
 
 
+class FixedActionAgent(Agent):
+    def __init__(self, fixed_action: tuple):
+        self.fixed_action = fixed_action
+
+    def get_action(self, state: np.ndarray) -> Action:
+        return Action(bid = self.fixed_action[0], ask=self.fixed_action[1])
+
+
 class FixedSpreadAgent(Agent):
     def __init__(self, half_spread: float = 1.0, offset: float = 0.0):
         self.half_spread = half_spread

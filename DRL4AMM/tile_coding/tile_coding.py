@@ -62,7 +62,7 @@ def get_tile_coding(feature, tilings):
 
 class QValueFunction:
 
-    def __init__(self, tilings, actions, lr):
+    def __init__(self, tilings, actions, lr, gamma, eps):
         self.tilings = tilings
         self.num_tilings = len(self.tilings)
         self.actions = actions
@@ -72,8 +72,8 @@ class QValueFunction:
         self.q_tables = [np.zeros(shape=(state_size + (len(self.actions),))) for state_size in self.state_sizes]
 
         # added by rahul 9-June-2022
-        self.gamma = 0.99
-        self.eps = 0.05
+        self.gamma = gamma
+        self.eps = eps
 
     def value(self, state, action):
         state_codings = get_tile_coding(state, self.tilings)  # [[5, 1], [4, 0], [3, 0]] ...

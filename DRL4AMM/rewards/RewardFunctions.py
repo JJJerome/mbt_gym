@@ -26,17 +26,13 @@ class PnL(RewardFunction):
 
 # observation space is (stock_price, cash, inventory, time)
 class CJ_criterion(RewardFunction):
+    def __init__(self, phi: NonNegativeFloat = 0.01, alpha: NonNegativeFloat = 0.01):
+        self.phi = phi
+        self.alpha = alpha
+
     """Cartea-Jaimungal type performance."""
 
-    def calculate(
-        self,
-        current_state,
-        action,
-        next_state,
-        is_terminal_step=False,
-        phi: NonNegativeFloat = 0.01,
-        terminal_penalty: NonNegativeFloat = 0.01,
-    ) -> float:
+    def calculate(self, current_state, action, next_state, is_terminal_step=False) -> float:
         current_market_value = current_state[1] + current_state[0] * current_state[2]
         next_market_value = next_state[1] + next_state[0] * next_state[2]
         dt = next_state[3] - current_state[3]
@@ -44,11 +40,11 @@ class CJ_criterion(RewardFunction):
             return (
                 next_market_value
                 - current_market_value
-                - dt * phi * (next_state[2] - current_state[2]) ** 2
-                - terminal_penalty * (next_state[2] - current_state[2]) ** 2
+                - dt * self.phi * (next_state[2] - current_state[2]) ** 2
+                - self.alpha * (next_state[2] - current_state[2]) ** 2
             )
         else:
-            return next_market_value - current_market_value - dt * phi * (next_state[2] - current_state[2]) ** 2
+            return next_market_value - current_market_value - dt * self.phi * (next_state[2] - current_state[2]) ** 2
 
 
 class TerminalExponentialUtility(RewardFunction):

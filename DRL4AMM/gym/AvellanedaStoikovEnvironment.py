@@ -6,7 +6,7 @@ from gym.spaces import Box
 from math import sqrt, isclose
 
 from DRL4AMM.gym.models import Action
-from DRL4AMM.rewards.RewardFunctions import RewardFunction, PnL, CJ_criterion
+from DRL4AMM.rewards.RewardFunctions import RewardFunction, CJ_criterion
 
 
 class AvellanedaStoikovEnvironment(gym.Env):
@@ -14,13 +14,13 @@ class AvellanedaStoikovEnvironment(gym.Env):
 
     def __init__(
         self,
-        terminal_time: float = 1.0,
-        n_steps: int = 1000,
+        terminal_time: float = 30.0,
+        n_steps: int = 30*10,
         reward_function: RewardFunction = None,
         drift: float = 0.0,
-        volatility: float = 1.0,
-        arrival_rate: float = 50.0,
-        fill_exponent: float = 1.5,
+        volatility: float = 0.01,
+        arrival_rate: float = 1.0,
+        fill_exponent: float = 100.0,
         max_inventory: int = 100,
         max_cash: float = None,
         max_stock_price: float = None,
@@ -34,7 +34,7 @@ class AvellanedaStoikovEnvironment(gym.Env):
         super(AvellanedaStoikovEnvironment, self).__init__()
         self.terminal_time = terminal_time
         self.n_steps = n_steps
-        self.reward_function = reward_function or CJ_criterion()  # PnL()
+        self.reward_function = reward_function or CJ_criterion(phi=2*10**(-4), alpha=0.0001)
         self.drift = drift
         self.volatility = volatility
         self.arrival_rate = arrival_rate

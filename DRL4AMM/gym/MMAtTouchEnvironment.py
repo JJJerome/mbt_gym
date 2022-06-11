@@ -14,15 +14,15 @@ class MMAtTouchEnvironment(gym.Env):
 
     def __init__(
         self,
-        terminal_time: float = 1.0,
-        n_steps: int = 1000,
+        terminal_time: float = 300.0,
+        n_steps: int = 300,
         reward_function: RewardFunction = None,
         drift: float = 0.0,
-        volatility: float = 1.0,
-        arrival_rate: float = 50.0,
+        volatility: float = 0.001,
+        arrival_rate: float = 50.0 / 300,
         half_spread: float = 0.01,
         mean_jump_size: float = 0.02,
-        max_inventory: int = 100,
+        max_inventory: int = 20,
         max_cash: float = None,
         max_stock_price: float = None,
         initial_cash: float = 0.0,
@@ -34,7 +34,7 @@ class MMAtTouchEnvironment(gym.Env):
         super(MMAtTouchEnvironment, self).__init__()
         self.terminal_time = terminal_time
         self.n_steps = n_steps
-        self.reward_function = reward_function or CJ_criterion()
+        self.reward_function = reward_function or CJ_criterion(phi=0.01, alpha=10 * 0.01)
         self.drift = drift
         self.volatility = volatility
         self.arrival_rate = arrival_rate

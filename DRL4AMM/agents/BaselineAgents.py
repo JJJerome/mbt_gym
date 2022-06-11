@@ -20,7 +20,7 @@ class FixedActionAgent(Agent):
         self.fixed_action = fixed_action
 
     def get_action(self, state: np.ndarray) -> Action:
-        return Action(bid = self.fixed_action[0], ask=self.fixed_action[1])
+        return Action(bid=self.fixed_action[0], ask=self.fixed_action[1])
 
 
 class FixedSpreadAgent(Agent):

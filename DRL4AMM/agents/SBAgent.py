@@ -8,7 +8,7 @@ from DRL4AMM.gym.models import Action
 
 
 class SBAgent(Agent):
-    def __init__(self, model: BaseAlgorithm, reduced_training:bool = False):
+    def __init__(self, model: BaseAlgorithm, reduced_training: bool = False):
         self.model = model
         self.reduced_training = reduced_training
 

@@ -6,7 +6,7 @@ from gym.spaces import Box, MultiBinary
 from math import sqrt, isclose
 
 from DRL4AMM.gym.models import Action
-from DRL4AMM.rewards.RewardFunctions import RewardFunction, PnL, CJ_criterion
+from DRL4AMM.rewards.RewardFunctions import RewardFunction, CJ_criterion
 
 
 class MMAtTouchEnvironment(gym.Env):
@@ -21,7 +21,7 @@ class MMAtTouchEnvironment(gym.Env):
         volatility: float = 1.0,
         arrival_rate: float = 50.0,
         half_spread: float = 0.01,
-        mean_jump_size: float,
+        mean_jump_size: float = 0.02,
         max_inventory: int = 100,
         max_cash: float = None,
         max_stock_price: float = None,
@@ -97,7 +97,7 @@ class MMAtTouchEnvironment(gym.Env):
     def get_next_asset_price(self):
         return self.state[0] + self.drift * self.dt + self.volatility * sqrt(self.dt) * self.rng.normal()
 
-    def get_next_asset_price_pure_jump(self, bid_arrival:bool, ask_arrival:bool):
+    def get_next_asset_price_pure_jump(self, bid_arrival: bool, ask_arrival: bool):
         # Midprice model driven purely by posson arrivals
         next_price = self.state[0]
         if bid_arrival:
@@ -106,7 +106,6 @@ class MMAtTouchEnvironment(gym.Env):
             next_price -= 2 * self.mean_jump_size - self.rng.random()
         return next_price
 
-
     def fill_prob(self, action: float) -> float:
         prob_market_arrival = 1.0 - np.exp(-self.arrival_rate * self.dt)
         return prob_market_arrival * action
@@ -114,4 +113,3 @@ class MMAtTouchEnvironment(gym.Env):
     @property
     def arrival_prob(self):
         return 1.0 - np.exp(-self.arrival_rate * self.dt)
-

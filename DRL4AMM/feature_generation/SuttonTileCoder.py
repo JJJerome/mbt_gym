@@ -50,9 +50,11 @@ class IHT:
             + " items"
         )
 
+    @property
     def count(self):
         return len(self.dictionary)
 
+    @property
     def fullp(self):
         return len(self.dictionary) >= self.size
 
@@ -63,7 +65,7 @@ class IHT:
         elif readonly:
             return None
         size = self.size
-        count = self.count()
+        count = self.count
         if count >= size:
             if self.overfullCount == 0:
                 print("IHT full, starting to allow collisions")

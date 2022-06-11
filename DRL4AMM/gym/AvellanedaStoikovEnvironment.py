@@ -15,7 +15,7 @@ class AvellanedaStoikovEnvironment(gym.Env):
     def __init__(
         self,
         terminal_time: float = 30.0,
-        n_steps: int = 30*10,
+        n_steps: int = 30 * 10,
         reward_function: RewardFunction = None,
         drift: float = 0.0,
         volatility: float = 0.01,
@@ -34,7 +34,7 @@ class AvellanedaStoikovEnvironment(gym.Env):
         super(AvellanedaStoikovEnvironment, self).__init__()
         self.terminal_time = terminal_time
         self.n_steps = n_steps
-        self.reward_function = reward_function or CJ_criterion(phi=2*10**(-4), alpha=0.0001)
+        self.reward_function = reward_function or CJ_criterion(phi=2 * 10 ** (-4), alpha=0.0001)
         self.drift = drift
         self.volatility = volatility
         self.arrival_rate = arrival_rate

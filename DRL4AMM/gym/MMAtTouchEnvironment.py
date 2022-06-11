@@ -25,6 +25,7 @@ class MMAtTouchEnvironment(gym.Env):
         max_inventory: int = 20,
         max_cash: float = None,
         max_stock_price: float = None,
+        max_inventory_exceeded_penalty: float = None,  # typing: ignore
         initial_cash: float = 0.0,
         initial_inventory: int = 0,
         initial_stock_price: float = 100.0,
@@ -42,14 +43,16 @@ class MMAtTouchEnvironment(gym.Env):
         self.mean_jump_size = mean_jump_size
         self.max_inventory = max_inventory
         self.max_cash = max_cash or initial_cash + arrival_rate * initial_stock_price * 5.0
-        self.max_stock_price = max_stock_price or initial_stock_price * 2.0  # 100
+        self.max_stock_price = max_stock_price or initial_stock_price * 2.0
+        self.max_inventory_exceeded_penalty = (
+            max_inventory_exceeded_penalty or self.initial_stock_price * self.volatility * self.dt * 10
+        )
         self.initial_cash = initial_cash
         self.initial_inventory = initial_inventory
         self.initial_stock_price = initial_stock_price
         self.continuous_observation_space = continuous_observation_space
         self.rng = np.random.default_rng(seed)
         self.dt = self.terminal_time / self.n_steps
-        self.max_inventory_exceeded_penalty = self.initial_stock_price * self.volatility * self.dt * 10
         self.action_space = MultiBinary(2)  # agent chooses spread on bid and ask
         # observation space is (stock price, cash, inventory, step_number)
         self.observation_space = Box(

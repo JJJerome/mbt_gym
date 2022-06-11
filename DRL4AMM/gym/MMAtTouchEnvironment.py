@@ -15,7 +15,7 @@ class MMAtTouchEnvironment(gym.Env):
     def __init__(
         self,
         terminal_time: float = 300.0,
-        n_steps: int = 300,
+        n_steps: int = int(10 * 300 / 50),
         reward_function: RewardFunction = None,
         drift: float = 0.0,
         volatility: float = 0.001,

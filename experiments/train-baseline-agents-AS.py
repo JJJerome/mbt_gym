@@ -7,10 +7,6 @@ import sys
 
 sys.path.append("../../")
 
-# from RL4MM.gym.AvellanedaStoikovEnvironment import AvellanedaStoikovEnvironment  # noqa: E402
-# from RL4MM.gym.wrappers import ReduceStateSizeWrapper  # noqa: E402
-# from RL4MM.rewards.RewardFunctions import InventoryAdjustedPnL  # noqa: E402
-
 from DRL4AMM.gym.AvellanedaStoikovEnvironment import AvellanedaStoikovEnvironment  # noqa: E402
 from DRL4AMM.gym.wrappers import ReduceStateSizeWrapper  # noqa: E402
 from DRL4AMM.rewards.RewardFunctions import InventoryAdjustedPnL  # noqa: E402

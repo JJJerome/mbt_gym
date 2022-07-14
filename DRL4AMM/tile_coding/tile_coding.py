@@ -11,8 +11,8 @@ def create_tiling(feat_range, bins, offset):
     bins: number of bins for that feature; example: 10
     offset: offset for that feature; example: 0.2
     """
-    
-    return np.linspace(feat_range[0], feat_range[1], bins+1)[1:-1] + offset
+
+    return np.linspace(feat_range[0], feat_range[1], bins + 1)[1:-1] + offset
 
 
 def create_tilings(feature_ranges, number_tilings, bins, offsets):
@@ -27,7 +27,7 @@ def create_tilings(feature_ranges, number_tilings, bins, offsets):
     for tile_i in range(number_tilings):
         tiling_bin = bins[tile_i]
         tiling_offset = offsets[tile_i]
-        
+
         tiling = []
         # for each feature dimension
         for feat_i in range(len(feature_ranges)):
@@ -57,18 +57,19 @@ def get_tile_coding(feature, tilings):
         feat_codings.append(feat_coding)
     return np.array(feat_codings)
 
+
 # example Q-function
 
 
 class QValueFunction:
-
     def __init__(self, tilings, actions, lr, gamma, eps):
         self.tilings = tilings
         self.num_tilings = len(self.tilings)
         self.actions = actions
         self.lr = lr  # /self.num_tilings  # learning rate equally assigned to each tiling
-        self.state_sizes = [tuple(len(splits) + 1 for splits in tiling) for tiling in
-                            self.tilings]  # [(10, 10), (10, 10), (10, 10)]
+        self.state_sizes = [
+            tuple(len(splits) + 1 for splits in tiling) for tiling in self.tilings
+        ]  # [(10, 10), (10, 10), (10, 10)]
         self.q_tables = [np.zeros(shape=(state_size + (len(self.actions),))) for state_size in self.state_sizes]
 
         # added by rahul 9-June-2022
@@ -93,18 +94,17 @@ class QValueFunction:
             delta = target - q_table[tuple(coding) + (action_idx,)]
             q_table[tuple(coding) + (action_idx,)] += self.lr * (delta)
 
-
     ###########################################################################
     # added by rahul 9-June-2022
     ###########################################################################
     def get_action_q_value_dict(self, state):
-        return {action:self.value(state,action) for action in self.actions}
+        return {action: self.value(state, action) for action in self.actions}
 
     def get_best_q_value(self, state):
         """
         max_{a in actions} Q(state, a)
         """
-        return max(self.get_action_q_value_dict(state).values()) 
+        return max(self.get_action_q_value_dict(state).values())
 
     def greedy(self, state):
         """
@@ -112,11 +112,10 @@ class QValueFunction:
         """
 
         q_value_dict = self.get_action_q_value_dict(state)
-   
+
         best_value = max(q_value_dict.values())
 
-        best_actions = [action for action in self.actions 
-                                    if q_value_dict[action] == best_value] 
+        best_actions = [action for action in self.actions if q_value_dict[action] == best_value]
 
         return best_actions[0]
 
@@ -127,7 +126,6 @@ class QValueFunction:
 
         else:
             return self.greedy(state)
-
 
     def get_target(self, reward, new_state):
         """

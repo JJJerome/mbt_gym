@@ -15,7 +15,7 @@ from ray.tune.schedulers import ASHAScheduler
 
 from DRL4AMM.gym.AvellanedaStoikovEnvironment import AvellanedaStoikovEnvironment
 from DRL4AMM.gym.wrappers import ReduceStateSizeWrapper
-from DRL4AMM.rewards.RewardFunctions import CJ_criterion, PnL
+from DRL4AMM.rewards.RewardFunctions import CJ_criterion
 
 num_workers = 10
 info = ray.init(
@@ -44,6 +44,12 @@ env_config = dict(
 
 def wrapped_env_creator(env_config: dict):
     return ReduceStateSizeWrapper(AvellanedaStoikovEnvironment(**env_config))
+
+
+def save_best_checkpoint_path(path_to_save_dir: str, best_checkpoint_path: str):
+    text_file = open(path_to_save_dir + "/best_checkpoint_path.txt", "wt")
+    text_file.write(best_checkpoint_path)
+    text_file.close()
 
 
 register_env("AvellanedaStoikovEnvironment", wrapped_env_creator)

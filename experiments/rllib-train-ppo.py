@@ -64,7 +64,7 @@ config["env"] = "AvellanedaStoikovEnvironment"
 config["env_config"] = env_config
 
 config["num_workers"] = num_workers
-config["num_gpus"] = 2
+config["num_gpus"] = 1
 
 config["rollout_fragment_length"] = tune.choice([30, 100, 300])
 config["model"] = {"fcnet_activation": "tanh", "fcnet_hiddens": [16, 16]}

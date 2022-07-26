@@ -33,8 +33,10 @@ env_config = dict(
     max_half_spread=10.0,
 )
 
-def wrapped_env_creator(env_config:dict):
+
+def wrapped_env_creator(env_config: dict):
     return ReduceStateSizeWrapper(AvellanedaStoikovEnvironment(**env_config))
+
 
 register_env("AvellanedaStoikovEnvironment", wrapped_env_creator)
 
@@ -43,12 +45,12 @@ config["use_gae"] = True  # Don't use generalised advantage estimation
 config["framework"] = "tf2"
 config["sample_async"] = False
 config["entropy_coeff"] = 0.01
-config["lr"] = 0.001,
-config["use_critic"] = True # False # For reinforce,
-config["optimizer"] = "SGD",
-config["model"]["fcnet_hiddens"] = [16,16]
-config["eager_tracing"] = True,
-config["train_batch_size"] = tune.choice([2**7, 2**9, 2**11, 2**13, 2**15]),
+config["lr"] = (0.001,)
+config["use_critic"] = True  # False # For reinforce,
+config["optimizer"] = ("SGD",)
+config["model"]["fcnet_hiddens"] = [16, 16]
+config["eager_tracing"] = (True,)
+config["train_batch_size"] = (tune.choice([2**7, 2**9, 2**11, 2**13, 2**15]),)
 config["env"] = "AvellanedaStoikovEnvironment"
 config["env_config"] = env_config
 config["num_workers"] = num_workers
@@ -65,14 +67,13 @@ analysis = tune.run(
     config=config,
     checkpoint_at_end=True,
     local_dir=tensorboard_logdir,
-    stop={"training_iteration": 3000}
+    stop={"training_iteration": 3000},
+    scheduler=ASHAScheduler(metric="episode_reward_mean", mode="max"),
 )
 
 best_checkpoint = analysis.get_trial_checkpoints_paths(
-        trial=analysis.get_best_trial("episode_reward_mean"),
-        metric="episode_reward_mean",
-        mode="max"
-    )
+    trial=analysis.get_best_trial("episode_reward_mean"), metric="episode_reward_mean", mode="max"
+)
 print(best_checkpoint)
 path_to_save_dir = tensorboard_logdir
 save_best_checkpoint_path(path_to_save_dir, best_checkpoint[0][0])

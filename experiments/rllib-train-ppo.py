@@ -15,7 +15,7 @@ from ray.tune.schedulers import ASHAScheduler
 
 from DRL4AMM.gym.AvellanedaStoikovEnvironment import AvellanedaStoikovEnvironment
 from DRL4AMM.gym.wrappers import ReduceStateSizeWrapper
-from DRL4AMM.rewards.RewardFunctions import CJ_criterion
+from DRL4AMM.rewards.RewardFunctions import PnL
 
 num_workers = 10
 info = ray.init(

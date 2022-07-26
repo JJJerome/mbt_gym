@@ -44,17 +44,22 @@ register_env("AvellanedaStoikovEnvironment", wrapped_env_creator)
 config = copy(DEFAULT_CONFIG)
 config["use_gae"] = True  # Don't use generalised advantage estimation
 config["framework"] = "tf2"
+config["num_samples"] = 10
+config["envs_per_worker"] = 50
 config["sample_async"] = False
 config["entropy_coeff"] = 0.01
 config["lr"] = 0.001
 config["use_critic"] = True  # False # For reinforce,
 config["optimizer"] = "SGD"
-config["model"]["fcnet_hiddens"] = [16, 16]
+config["model"]["fcnet_hiddens"] = [64, 64]
 config["eager_tracing"] = True
 config["train_batch_size"] = tune.choice([2**7, 2**9, 2**11, 2**13, 2**15])
 config["env"] = "AvellanedaStoikovEnvironment"
 config["env_config"] = env_config
+
 config["num_workers"] = num_workers
+config["num_gpus"] = 2
+
 config["rollout_fragment_length"] = tune.choice([30, 100, 300])
 config["model"] = {"fcnet_activation": "tanh", "fcnet_hiddens": [16, 16]}
 config["sgd_minibatch_size"] = tune.choice([2**3, 2**5, 2**7])

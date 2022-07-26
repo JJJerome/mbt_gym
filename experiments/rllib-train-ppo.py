@@ -18,7 +18,14 @@ from DRL4AMM.gym.wrappers import ReduceStateSizeWrapper
 from DRL4AMM.rewards.RewardFunctions import CJ_criterion, PnL
 
 num_workers = 10
-ray.init(ignore_reinit_error=True, num_cpus=num_workers + 1)
+info = ray.init(
+    ignore_reinit_error=True,
+    num_cpus=num_workers + 1,
+    include_dashboard=True,
+    dashboard_host="0.0.0.0",
+    dashboard_port=8266,
+)
+print("Dashboard URL: http://{}".format(info.address_info["webui_url"]))
 
 terminal_time = 3
 arrival_rate = 1.0
@@ -44,7 +51,6 @@ register_env("AvellanedaStoikovEnvironment", wrapped_env_creator)
 config = copy(DEFAULT_CONFIG)
 config["use_gae"] = True  # Don't use generalised advantage estimation
 config["framework"] = "tf2"
-config["num_samples"] = 10
 config["envs_per_worker"] = 50
 config["sample_async"] = False
 config["entropy_coeff"] = 0.01
@@ -70,6 +76,7 @@ tensorboard_logdir = "../data/tensorboard"
 print("Starting training")
 analysis = tune.run(
     "PPO",
+    num_samples=10,
     config=config,
     checkpoint_at_end=True,
     local_dir=tensorboard_logdir,

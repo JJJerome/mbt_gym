@@ -51,7 +51,7 @@ register_env("AvellanedaStoikovEnvironment", wrapped_env_creator)
 config = copy(DEFAULT_CONFIG)
 config["use_gae"] = True  # Don't use generalised advantage estimation
 config["framework"] = "tf2"
-config["envs_per_worker"] = 50
+config["num_envs_per_worker"] = 50
 config["sample_async"] = False
 config["entropy_coeff"] = 0.01
 config["lr"] = 0.001

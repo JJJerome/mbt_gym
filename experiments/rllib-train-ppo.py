@@ -62,14 +62,13 @@ config["entropy_coeff"] = 0.01
 config["lr"] = 0.001
 config["use_critic"] = True  # False # For reinforce,
 config["optimizer"] = "SGD"
-config["model"]["fcnet_hiddens"] = [64, 64]
+config["model"]["fcnet_hiddens"] = [32, 32]
 config["eager_tracing"] = True
 config["train_batch_size"] = tune.choice([2**7, 2**9, 2**11, 2**13, 2**15])
 config["env"] = "AvellanedaStoikovEnvironment"
 config["env_config"] = env_config
 
 config["num_workers"] = num_workers
-config["num_gpus"] = 1
 
 config["rollout_fragment_length"] = tune.choice([30, 100, 300])
 config["model"] = {"fcnet_activation": "tanh", "fcnet_hiddens": [16, 16]}

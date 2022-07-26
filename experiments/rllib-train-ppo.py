@@ -10,6 +10,7 @@ from ray import tune
 from ray.tune.registry import register_env
 from copy import copy
 from ray.rllib.agents.ppo import DEFAULT_CONFIG
+from ray.tune.schedulers import ASHAScheduler
 
 
 from DRL4AMM.gym.AvellanedaStoikovEnvironment import AvellanedaStoikovEnvironment

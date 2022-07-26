@@ -27,7 +27,7 @@ info = ray.init(
 )
 print("Dashboard URL: http://{}".format(info.address_info["webui_url"]))
 
-terminal_time = 3
+terminal_time = 30
 arrival_rate = 1.0
 env_config = dict(
     terminal_time=terminal_time,
@@ -51,7 +51,6 @@ register_env("AvellanedaStoikovEnvironment", wrapped_env_creator)
 config = copy(DEFAULT_CONFIG)
 config["use_gae"] = True  # Don't use generalised advantage estimation
 config["framework"] = "tf2"
-config["num_envs_per_worker"] = 50
 config["sample_async"] = False
 config["entropy_coeff"] = 0.01
 config["lr"] = 0.001

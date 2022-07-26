@@ -48,16 +48,18 @@ config["use_critic"] = True # False # For reinforce,
 config["optimizer"] = "SGD",
 config["model"]["fcnet_hiddens"] = [16,16]
 config["eager_tracing"] = True,
-config["train_batch_size"] = 100000,
+config["train_batch_size"] = tune.choice([2**7, 2**9, 2**11, 2**13, 2**15]),
 config["env"] = "AvellanedaStoikovEnvironment"
 config["env_config"] = env_config
 config["num_workers"] = num_workers
+config["rollout_fragment_length"] = tune.choice([30, 100, 300])
 config["model"] = {"fcnet_activation": "tanh", "fcnet_hiddens": [16, 16]}
-config["sgd_minibatch_size"] = 10000
-config["num_sgd_iter"] = 10
+config["sgd_minibatch_size"] = tune.choice([2**3, 2**5, 2**7])
+config["num_sgd_iter"] = tune.choice([10, 20, 30])
 
 tensorboard_logdir = "../data/tensorboard"
 
+print("Starting training")
 analysis = tune.run(
     "PPO",
     config=config,

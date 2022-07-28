@@ -82,6 +82,7 @@ class AvellanedaStoikovEnvironment(gym.Env):
         next_state = deepcopy(self.state)
         next_state[0] += self.drift * self.dt + self.volatility * sqrt(self.dt) * self.rng.normal()
         next_state[3] += self.dt
+        next_state[3] = np.round(next_state[3], decimals=3)  # due to floating point arithmetic in self.dt
         fill_prob_bid, fill_prob_ask = self.fill_prob(action.bid), self.fill_prob(action.ask)
         unif_bid, unif_ask = self.rng.random(2)
         if unif_bid > fill_prob_bid and unif_ask > fill_prob_ask:  # neither the agent's bid nor their ask is filled

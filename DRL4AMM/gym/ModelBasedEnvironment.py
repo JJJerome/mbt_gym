@@ -60,7 +60,7 @@ class ModelBasedEnvironment(gym.Env):
         self.trajectory: Iterator = iter([])
 
     def reset(self):
-        self.trajectory = iter(self.midprice_model.generate_trajectory(self.timestamps))
+        self.trajectory = iter(self.midprice_model.get_next_price(self.timestamps))
         self.obs = np.array([next(self.trajectory), self.initial_cash, self.initial_inventory, 0])
         return self.obs
 
@@ -79,7 +79,7 @@ class ModelBasedEnvironment(gym.Env):
         next_obs[0] = next(self.trajectory)
         next_obs[3] += self.dt
         fill_prob_bid, fill_prob_ask = [
-            self.arrival_model.calculate_arrival_rate(self.dt)
+            self.arrival_model.calculate_next_arrival_rate(self.dt)
             * self.fill_probability_function.calculate_fill_probability(a)
             for a in action
         ]

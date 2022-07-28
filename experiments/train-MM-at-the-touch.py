@@ -9,6 +9,7 @@ from stable_baselines3.common.monitor import Monitor
 
 
 import sys
+
 sys.path.append("../")
 
 from DRL4AMM.gym.MMAtTouchEnvironment import MMAtTouchEnvironment
@@ -17,7 +18,7 @@ from DRL4AMM.gym.helpers.plotting import *
 from DRL4AMM.rewards.RewardFunctions import CJ_criterion
 
 reward_function = CJ_criterion(phi=0.01, alpha=10 * 0.01)
-env_params = {"reward_function":reward_function, "max_inventory_exceeded_penalty":0.1}
+env_params = {"reward_function": reward_function, "max_inventory_exceeded_penalty": 0.1}
 env = MMAtTouchEnvironment(**env_params)
 
 terminal_time = env.terminal_time
@@ -32,7 +33,7 @@ best_model_path = save_dir + "SB_models/PPO-best-touch"
 trained_model_path = save_dir + "SB_models/PPO-last-touch"
 reduced_env = Monitor(ReduceStateSizeWrapper(env))
 n_envs = 10
-gym.envs.register(id="touch-env-v0", entry_point="__main__:MMAtTouchEnvironment", kwargs = env_params)
+gym.envs.register(id="touch-env-v0", entry_point="__main__:MMAtTouchEnvironment", kwargs=env_params)
 vec_env = make_vec_env(env_id="touch-env-v0", n_envs=n_envs, wrapper_class=ReduceStateSizeWrapper)
 
 ppo_policy_kwargs = dict(activation_fn=th.nn.ReLU, net_arch=[dict(pi=[64, 64], vf=[64, 64])])
@@ -46,43 +47,51 @@ def linear_schedule(initial_value):
     return func
 
 
-schedule = linear_schedule(0.00003) # Here, we use the default SB value
+schedule = linear_schedule(0.00003)  # Here, we use the default SB value
 
-ppo_params = {"policy":'MlpPolicy', "env": vec_env, "verbose":1,
-              "policy_kwargs":ppo_policy_kwargs,
-              "tensorboard_log":tensorboard_logdir,
-              "batch_size": 256, "learning_rate": schedule, "device":"cpu"} #256 before (batch size)
-callback_params = dict(eval_env=reduced_env, n_eval_episodes = 500, #200 before  (n_eval_episodes)
-                       best_model_save_path = best_model_path,
-                       deterministic=True, eval_freq=5000)
+ppo_params = {
+    "policy": "MlpPolicy",
+    "env": vec_env,
+    "verbose": 1,
+    "policy_kwargs": ppo_policy_kwargs,
+    "tensorboard_log": tensorboard_logdir,
+    "batch_size": 256,
+    "learning_rate": schedule,
+    "device": "cpu",
+}  # 256 before (batch size)
+callback_params = dict(
+    eval_env=reduced_env,
+    n_eval_episodes=500,  # 200 before  (n_eval_episodes)
+    best_model_save_path=best_model_path,
+    deterministic=True,
+    eval_freq=5000,
+)
 callback = EvalCallback(**callback_params)
 model = PPO(**ppo_params)
 
 print("training model")
 
-model.learn(total_timesteps = 5_000_000, callback=callback)
+model.learn(total_timesteps=5_000_000, callback=callback)
 
 best_model = PPO.load(best_model_path + "/best_model")
 max_inventory = 5
-inventories = np.arange(-max_inventory,max_inventory+1,1)
+inventories = np.arange(-max_inventory, max_inventory + 1, 1)
 timesteps = np.linspace(0, terminal_time, 11)
 timestep_mesh, inventory_mesh = np.meshgrid(timesteps, inventories)
 bid_actions = np.zeros_like(timestep_mesh)
 ask_actions = np.zeros_like(timestep_mesh)
 for i, row in enumerate(timestep_mesh):
     for j, value in enumerate(row):
-        bid_actions[i,j] = best_model.predict(np.array([inventory_mesh[i,j], value]), deterministic=True)[0][0]
-        ask_actions[i,j] = best_model.predict(np.array([inventory_mesh[i,j], value]), deterministic=True)[0][1]
+        bid_actions[i, j] = best_model.predict(np.array([inventory_mesh[i, j], value]), deterministic=True)[0][0]
+        ask_actions[i, j] = best_model.predict(np.array([inventory_mesh[i, j], value]), deterministic=True)[0][1]
 extent = 0, 10, np.min(inventories), np.max(inventories)
-plt.imshow(bid_actions, extent = extent)
+plt.imshow(bid_actions, extent=extent)
 
 print("saving model figures")
 fig_dir = save_dir + "figs/"
-os.mkdirs(fig_dir, exists_ok = False)
+os.mkdirs(fig_dir, exists_ok=False)
 
 plt.savefig(fig_dir + "bid_actions")
-plt.imshow(ask_actions, extent = extent)
+plt.imshow(ask_actions, extent=extent)
 plt.savefig(fig_dir + "ask_actions")
 model.save(trained_model_path)
-
-

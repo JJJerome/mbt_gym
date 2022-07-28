@@ -67,6 +67,9 @@ config["eager_tracing"] = True
 config["train_batch_size"] = tune.choice([2**7, 2**9, 2**11, 2**13, 2**15])
 config["env"] = "AvellanedaStoikovEnvironment"
 config["env_config"] = env_config
+config["batch_mode"] = "complete_episodes"
+config["entropy_coeff"] = 0.001 # Add some entropy
+config["kl_target"] = 0.015
 
 config["num_workers"] = num_workers
 

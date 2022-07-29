@@ -30,11 +30,11 @@ class FillProbabilityFunction(metaclass=abc.ABCMeta):
 
 class ArrivalModel(metaclass=abc.ABCMeta):  # TODO: generalise
     @abc.abstractmethod
-    def calculate_next_arrival_rate(self) -> float:
+    def calculate_next_arrival_rates(self) -> float:
         pass
 
     @abc.abstractmethod
-    def get_arrival(self):
+    def get_arrivals(self) -> float:
         pass
 
 
@@ -80,6 +80,33 @@ class BrownianMotionMidpriceModel(MidpriceModel):
         return self.initial_price + 4 * self.volatility * self.terminal_time
 
 
+class GeometricBrownianMotionMidpriceModel(MidpriceModel):
+    def __init__(
+        self,
+        drift: float = 0.0,
+        volatility: float = 1.0,
+        initial_price: float = 100,
+        dt: float = 0.1,
+        terminal_time: float = 1.0,
+        seed: Optional[int] = None,
+    ):
+        self.drift = drift
+        self.volatility = volatility
+        self.initial_price = initial_price
+        self.dt = dt
+        self.terminal_time = terminal_time
+        self.rng = default_rng(seed)
+
+    def get_next_price(self, current_midprice: np.ndarray):
+        # Euler: current_midprice + self.drift * current_midprice * self.dt + self.volatility * current_midprice * sqrt(self.dt) * self.rng.normal()
+        return current_midprice*np.exp( (self.drift - self.volatility**2/2)*self.dt + self.volatility * sqrt(self.dt) * self.rng.normal() )
+
+    @property
+    def max_value(self):
+        stdev = sqrt(self.initial_price**2 * np.exp(2*self.drift*self.terminal_time)*(np.exp(self.volatility**2*self.terminal_time) -1) )
+        return self.initial_price*np.exp(self.drift*self.terminal_time) + 4 * stdev
+
+
 class ExponentialFillFunction(FillProbabilityFunction):
     def __init__(self, fill_exponent: float = 1.5, seed: Optional[int] = None):
         self.fill_exponent = fill_exponent
@@ -94,14 +121,46 @@ class ExponentialFillFunction(FillProbabilityFunction):
 
 
 class PoissonArrivalModel(ArrivalModel):
-
-    def __init__(self, intensity: float = 140, seed: Optional[int] = None):
+    def __init__(
+        self, intensity: float = 100, 
+        seed: Optional[int] = None
+    ):
         self.intensity = intensity
         self.rng = default_rng(seed)
 
-    def calculate_next_arrival_rate(self) -> float:
+    def calculate_next_arrival_rates(self) -> float:
         return self.intensity
 
-    def get_arrival(self, interval_length:float):
-        unif = self.rng.uniform()
+    def get_arrivals(self, interval_length:float) -> float:
+        unif = self.rng.uniform(size=2)
         return unif < self.intensity * interval_length
+
+
+class HawkesArrivalModel(ArrivalModel):
+    def __init__(
+        self, 
+        baseline_arrival_rate: float = 100, 
+        alpha: float = 2, 
+        beta: float = 0.5, 
+        time_horizon: float = 1,
+        seed: Optional[int] = None
+    ):
+        self.baseline_arrival_rate = baseline_arrival_rate
+        self.alpha = alpha  # see https://arxiv.org/pdf/1507.02822.pdf, equation (4).
+        self.beta = beta
+        self.time_horizon = time_horizon
+        self.rng = default_rng(seed)
+
+    def calculate_next_arrival_rates(self, intensities:np.ndarray, arrivals:float, interval_length:float) -> float:
+        next_intensities = ( intensities
+            + self.beta * (self.baseline_arrival_rate - intensities) * interval_length
+            + self.alpha * arrivals )
+        return next_intensities
+
+    def get_arrivals(self, intensities:np.ndarray, interval_length:float) -> float:
+        unif = self.rng.uniform(size=2)
+        return unif < intensities * interval_length
+    
+    @property
+    def get_max_arrival_rate(self):
+        return self.baseline_arrival_rate * 10 # TODO: Improve this with 4*std

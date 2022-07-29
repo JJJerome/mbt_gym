@@ -34,7 +34,7 @@ class ArrivalModel(metaclass=abc.ABCMeta):  # TODO: generalise
         pass
 
     @abc.abstractmethod
-    def get_arrivals(self):
+    def get_arrivals(self) -> float:
         pass
 
 
@@ -131,7 +131,7 @@ class PoissonArrivalModel(ArrivalModel):
     def calculate_next_arrival_rates(self) -> float:
         return self.intensity
 
-    def get_arrivals(self, interval_length:float):
+    def get_arrivals(self, interval_length:float) -> float:
         unif = self.rng.uniform(size=2)
         return unif < self.intensity * interval_length
 
@@ -157,7 +157,7 @@ class HawkesArrivalModel(ArrivalModel):
             + self.alpha * arrivals )
         return next_intensities
 
-    def get_arrivals(self, intensities:np.ndarray, interval_length:float):
+    def get_arrivals(self, intensities:np.ndarray, interval_length:float) -> float:
         unif = self.rng.uniform(size=2)
         return unif < intensities * interval_length
     

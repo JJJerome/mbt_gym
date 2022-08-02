@@ -87,7 +87,7 @@ class MMAtTouchEnvironment(gym.Env):
         next_state[3] += self.dt
         unif_bid, unif_ask = self.rng.random(2)
         bid_arrival = True if unif_bid < self.arrival_prob_ask else False
-        ask_arrival = True if unif_ask < self.arrival_prob_bid else False  
+        ask_arrival = True if unif_ask < self.arrival_prob_bid else False
         if bid_arrival:
             if action.bid:
                 next_state[1] -= self.state[0] - self.half_spread * action.bid

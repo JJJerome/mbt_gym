@@ -9,7 +9,7 @@ from DRL4AMM.gym.models import Action
 class RewardFunction(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def calculate(
-        self, current_state: np.ndarray, action: Action, next_state: np.ndarray, is_terminal_step: bool = False
+        self, current_state: np.ndarray, action: np.ndarray, next_state: np.ndarray, is_terminal_step: bool = False
     ) -> float:
         pass
 

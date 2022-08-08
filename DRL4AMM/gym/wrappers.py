@@ -15,9 +15,7 @@ class ReduceStateSizeWrapper(gym.Wrapper):
         super(ReduceStateSizeWrapper, self).__init__(env)
         assert type(env.observation_space) == gym.spaces.box.Box
         self.observation_space = gym.spaces.box.Box(
-            low=env.observation_space.low[2:],
-            high=env.observation_space.high[2:],
-            dtype=np.float64,
+            low=env.observation_space.low[2:], high=env.observation_space.high[2:], dtype=np.float64,
         )
 
     def reset(self):
@@ -48,9 +46,7 @@ class NormaliseASObservation(gym.Wrapper):
         self.normalisation_offset = (env.observation_space.high + env.observation_space.low) / 2
         assert type(env.observation_space) == gym.spaces.box.Box
         self.observation_space = gym.spaces.box.Box(
-            low=-np.ones(env.observation_space.shape),
-            high=np.ones(env.observation_space.shape),
-            dtype=np.float64,
+            low=-np.ones(env.observation_space.shape), high=np.ones(env.observation_space.shape), dtype=np.float64,
         )
 
     def reset(self):

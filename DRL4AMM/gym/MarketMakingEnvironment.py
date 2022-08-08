@@ -36,6 +36,7 @@ class MarketMakingEnvironment(gym.Env):
         max_stock_price: float = None,
         max_depth: float = None,
         market_order_penalty: float = None,
+        half_spread: float = None,
         seed: int = None,
     ):
         super(MarketMakingEnvironment, self).__init__()
@@ -49,18 +50,20 @@ class MarketMakingEnvironment(gym.Env):
         self.initial_cash = initial_cash
         self.initial_inventory = initial_inventory
         self.max_inventory = max_inventory
-        self.max_cash = max_cash or self._get_max_cash()
         self.cash = initial_cash
         self.inventory = initial_inventory
         self.max_stock_price = max_stock_price or self.midprice_model.max_value
+        self.max_cash = max_cash or self._get_max_cash()
         self.max_depth = max_depth or self._get_max_depth()
         self.rng = np.random.default_rng(seed)
         self.dt = self.terminal_time / self.n_steps
         self.initial_state = self._get_initial_state()
         self.observation_space = self._get_observation_space()
         self.action_space = self._get_action_space()
-        self.state: np.ndarray = np.array([])
+        self.time = 0.0
+        self.state = self._get_initial_state()
         self.market_order_penalty = market_order_penalty
+        self.half_spread = half_spread
 
     def reset(self):
         self.reset_internal_state()
@@ -69,29 +72,31 @@ class MarketMakingEnvironment(gym.Env):
         self.fill_probability_model.reset()
         return self.state
 
-    def step(self, action: np.ndarray):
+    def step(self, actions: np.ndarray):
         current_state = self.state
-        next_state = self._update_state(action)
+        next_state = self._update_state(actions)
         done = isclose(next_state[3], self.terminal_time)  # due to floating point arithmetic
-        reward = self.reward_function.calculate(current_state, action, next_state, done)
+        reward = self.reward_function.calculate(current_state, actions, next_state, done)
         return self.state, reward, done, {}
 
     def render(self, mode="human"):
         pass
-    
+
+    def _get_max_cash(self) -> float:
+        return self.max_inventory * self.max_stock_price
     
     # actions = [bid_depth, ask_depth, MO_buy, MO_sell]
     # state[0]=cash, state[1]=inventory, state[2]=time, then remaining states depend on dimensionality of the arrival
     # process, the midprice process and the fill probability process.
-    def _update_state(self, action: np.ndarray) -> np.ndarray:
+    def _update_state(self, actions: np.ndarray) -> np.ndarray:
         arrivals = self.arrival_model.get_arrivals()  # [arrivebid, arriveask]
-        depths = action[0:2]  # [depthbid, depthask]
+        depths = actions[0:2]  # [depthbid, depthask]
         fills = self.fill_probability_model.get_hypothetical_fills(depths)  # [fillbid, fillask]
-        self.arrival_model.update(arrivals, fills, action)  # TODO
-        self.midprice_model.update(arrivals, fills, action)  # TODO
-        self.fill_probability_model.update(arrivals, fills, action)  # TODO
-        self._update_cash_and_inventory(arrivals, fills, action)  # TODO
-        self.state = np.array([self.cash, self.inventory, self.time])
+        self.arrival_model.update(arrivals, fills, actions)  # TODO
+        self.midprice_model.update(arrivals, fills, actions)  # TODO
+        self.fill_probability_model.update(arrivals, fills, actions)  # TODO
+        self._update_cash_and_inventory(arrivals, fills, actions)  # TODO
+        self.state = np.array([self.cash, self.inventory, self.time],dtype=np.float32)
         self.state = np.append(self.state, self.arrival_model.current_state)
         self.state = np.append(self.state, self.midprice_model.current_state)
         self.state = np.append(self.state, self.fill_probability_model.current_state)
@@ -104,9 +109,16 @@ class MarketMakingEnvironment(gym.Env):
             best_bid = self.midprice_model.current_state-self.market_order_penalty
             best_ask = self.midprice_model.current_state+self.market_order_penalty
             self.cash += (MO_sell) * (best_bid) - (MO_buy) * best_ask
-
-        self.inventory = np.minimum(self.inventory + arrivals - fills, self.max_inventory)
-        self.cash = np.minimum(self.cash + arrivals - fills, self.max_cash)
+            self.inventory += (MO_buy) - (MO_sell) 
+        self.inventory += np.sum(arrivals * fills * [1, -1])
+        # TODO: clamp inventory to max_inventory
+        self.inventory = np.clip(self.inventory, -self.max_inventory, self.max_inventory)
+        depths = actions[0:2]  # [depthbid, depthask]
+        if self.action_type == "touch":
+            self.cash += np.sum(arrivals * fills * (self.midprice_model.current_state + depths*self.half_spread)*[-1,1])
+        else:
+            self.cash += np.sum(arrivals * fills * (self.midprice_model.current_state + depths)*[-1,1])
+        self.cash = np.clip(self.cash, -self.max_cash, self.max_cash)
         self.time += self.dt
         self.time = np.minimum(self.time, self.terminal_time)
         

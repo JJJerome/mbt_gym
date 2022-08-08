@@ -35,6 +35,7 @@ class MarketMakingEnvironment(gym.Env):
         max_cash: float = None,
         max_stock_price: float = None,
         max_depth: float = None,
+        market_order_penalty: float = None,
         seed: int = None,
     ):
         super(MarketMakingEnvironment, self).__init__()
@@ -59,6 +60,7 @@ class MarketMakingEnvironment(gym.Env):
         self.observation_space = self._get_observation_space()
         self.action_space = self._get_action_space()
         self.state: np.ndarray = np.array([])
+        self.market_order_penalty = market_order_penalty
 
     def reset(self):
         self.reset_internal_state()
@@ -76,24 +78,38 @@ class MarketMakingEnvironment(gym.Env):
 
     def render(self, mode="human"):
         pass
-
+    
+    
+    # actions = [bid_depth, ask_depth, MO_buy, MO_sell]
     # state[0]=cash, state[1]=inventory, state[2]=time, then remaining states depend on dimensionality of the arrival
     # process, the midprice process and the fill probability process.
     def _update_state(self, action: np.ndarray) -> np.ndarray:
-        arrivals = self.arrival_model.get_arrivals()
-        fills = self.fill_probability_model.get_fills(action)
-        self.arrival_model.update(arrivals)
-        self.midprice_model.update(arrivals)
-        self.fill_probability_model.update(arrivals)
-        self._update_cash_and_inventory(arrivals, fills)
+        arrivals = self.arrival_model.get_arrivals()  # [arrivebid, arriveask]
+        depths = action[0:2]  # [depthbid, depthask]
+        fills = self.fill_probability_model.get_hypothetical_fills(depths)  # [fillbid, fillask]
+        self.arrival_model.update(arrivals, fills, action)  # TODO
+        self.midprice_model.update(arrivals, fills, action)  # TODO
+        self.fill_probability_model.update(arrivals, fills, action)  # TODO
+        self._update_cash_and_inventory(arrivals, fills, action)  # TODO
         self.state = np.array([self.cash, self.inventory, self.time])
         self.state = np.append(self.state, self.arrival_model.current_state)
         self.state = np.append(self.state, self.midprice_model.current_state)
         self.state = np.append(self.state, self.fill_probability_model.current_state)
         return self.state
 
-    def _update_cash_and_inventory(self, arrivals: np.ndarray, fills: np.ndarray):
-        raise NotImplementedError
+    def _update_cash_and_inventory(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray):
+        if self.action_type == "limit_and_market":
+            MO_buy = float(actions[2] > 0.5)
+            MO_sell = float(actions[3] > 0.5)
+            best_bid = self.midprice_model.current_state-self.market_order_penalty
+            best_ask = self.midprice_model.current_state+self.market_order_penalty
+            self.cash += (MO_sell) * (best_bid) - (MO_buy) * best_ask
+
+        self.inventory = np.minimum(self.inventory + arrivals - fills, self.max_inventory)
+        self.cash = np.minimum(self.cash + arrivals - fills, self.max_cash)
+        self.time += self.dt
+        self.time = np.minimum(self.time, self.terminal_time)
+        
 
     def reset_internal_state(self):
         self.state = self.initial_state  # TODO: do we need self.state? There is repetition.
@@ -119,11 +135,7 @@ class MarketMakingEnvironment(gym.Env):
         high = np.append(high, self.arrival_model.max_value)
         high = np.append(high, self.midprice_model.max_value)
         high = np.append(high, self.fill_probability_model.max_value)
-        return Box(
-            low=low,
-            high=high,
-            dtype=np.float64,
-        )
+        return Box(low=low, high=high, dtype=np.float64,)
 
     def _get_action_space(self) -> gym.spaces.Space:
         assert self.action_type in ACTION_SPACES, f"Action type {self.action_type} is not in {ACTION_SPACES}."
@@ -134,13 +146,7 @@ class MarketMakingEnvironment(gym.Env):
             return gym.spaces.Box(low=0.0, high=max_depth, shape=(2,))  # agent chooses spread on bid and ask
         if self.action_type == "limit_and_market":
             max_depth = self.fill_probability_model.max_depth
-            return gym.spaces.Box(
-                low=np.zeros(
-                    4,
-                ),
-                high=np.array(max_depth, max_depth, 1, 1),
-                shape=(2,),
-            )
+            return gym.spaces.Box(low=np.zeros(4,), high=np.array(max_depth, max_depth, 1, 1), shape=(2,),)
 
     @staticmethod
     def _get_max_depth():

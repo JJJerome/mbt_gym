@@ -87,7 +87,6 @@ class BrownianMotionMidpriceModel(MidpriceModel):
     ):
         self.drift = drift
         self.volatility = volatility
-        self.current_midprice = initial_price
         self.terminal_time = terminal_time
         super().__init__(
            min_value = initial_price - (self._get_max_value(initial_price, terminal_time) - initial_price), 
@@ -99,15 +98,14 @@ class BrownianMotionMidpriceModel(MidpriceModel):
         )
         
     def reset(self):
-        self.current_midprice = self.initial_state
+        self.current_state = self.initial_state
 
     def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> float:
-        self.current_midprice = (
-            self.current_midprice
+        self.current_state = (
+            self.current_state
             + self.drift * self.step_size
             + self.volatility * sqrt(self.step_size) * self.rng.normal()
         )
-        return self.current_midprice
 
     def _get_max_value(self, initial_price, terminal_time):
         return initial_price + 4 * self.volatility * terminal_time
@@ -125,7 +123,6 @@ class GeometricBrownianMotionMidpriceModel(MidpriceModel):
     ):
         self.drift = drift
         self.volatility = volatility
-        self.current_midprice = initial_price
         super().__init__(
            min_value = initial_price - (self._get_max_value(initial_price, terminal_time) - initial_price), 
            max_value = self._get_max_value(initial_price, terminal_time), 
@@ -136,15 +133,14 @@ class GeometricBrownianMotionMidpriceModel(MidpriceModel):
         )
         
     def reset(self):
-        self.current_midprice = self.initial_state
+        self.current_state = self.initial_state
 
     def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> float:
         # Euler: current_midprice + self.drift * current_midprice * self.dt + self.volatility * current_midprice * sqrt(self.dt) * self.rng.normal()
-        self.current_midprice = self.current_midprice * np.exp(
+        self.current_state = self.current_state * np.exp(
             (self.drift - self.volatility ** 2 / 2) * self.step_size
             + self.volatility * sqrt(self.step_size) * self.rng.normal()
         )
-        return self.current_midprice
 
     def _get_max_value(self, initial_price, terminal_time):
         stdev = sqrt(
@@ -181,13 +177,13 @@ class ExponentialFillFunction(FillProbabilityModel):
     def reset(self):
         pass
 
-    def update(self) -> float:
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray):
         pass
 
 
 
 class PoissonArrivalModel(ArrivalModel):
-    def __init__(self, intensity: np.ndarray = [100, 100], step_size: float = 0.01, seed: Optional[int] = None):
+    def __init__(self, intensity: np.ndarray = np.array([100., 100.]), step_size: float = 0.01, seed: Optional[int] = None):
         self.intensity = intensity
         super().__init__(
             min_value = np.array([]), 
@@ -199,9 +195,11 @@ class PoissonArrivalModel(ArrivalModel):
         )
 
     def update(
-        self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray
-    ) -> np.ndarray:
-        return self.intensity
+        self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray):
+        pass
+
+    def reset(self):
+        pass       
 
     def get_arrivals(self) -> np.ndarray:
         unif = self.rng.uniform(size=2)
@@ -211,7 +209,7 @@ class PoissonArrivalModel(ArrivalModel):
 class HawkesArrivalModel(ArrivalModel):
     def __init__(
         self,
-        baseline_arrival_rate: np.ndarray = [100, 100],
+        baseline_arrival_rate: np.ndarray = np.array([100., 100.]),
         step_size: float = 0.01,
         alpha: float = 2,
         beta: float = 0.5,
@@ -219,7 +217,6 @@ class HawkesArrivalModel(ArrivalModel):
         seed: Optional[int] = None,
     ):
         self.baseline_arrival_rate = baseline_arrival_rate
-        self.current_arrival_rates = baseline_arrival_rate
         self.alpha = alpha  # see https://arxiv.org/pdf/1507.02822.pdf, equation (4).
         self.beta = beta
         super().__init__(
@@ -232,21 +229,21 @@ class HawkesArrivalModel(ArrivalModel):
         )
 
     def reset(self):
-        self.current_arrival_rates = self.baseline_arrival_rate
+        self.current_state = self.baseline_arrival_rate
 
     def update(
         self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray
     ) -> np.ndarray:
-        self.current_arrival_rates = (
-            self.current_arrival_rates
-            + self.beta * (self.baseline_arrival_rate - self.current_arrival_rates) * self.step_size
+        self.current_state = (
+            self.current_state
+            + self.beta * (self.baseline_arrival_rate - self.current_state) * self.step_size
             + self.alpha * arrivals
         )
-        return self.current_arrival_rates
+        return self.current_state
 
     def get_arrivals(self) -> np.ndarray:
         unif = self.rng.uniform(size=2)
-        return unif < self.current_arrival_rates * self.step_size
+        return unif < self.current_state * self.step_size
 
     def _get_max_arrival_rate(self):
         return self.baseline_arrival_rate * 10  # TODO: Improve this with 4*std

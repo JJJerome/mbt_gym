@@ -1,3 +1,4 @@
+from xmlrpc.client import boolean
 import gym
 import numpy as np
 
@@ -111,18 +112,26 @@ class MarketMakingEnvironment(gym.Env):
             self.cash += (MO_sell) * (best_bid) - (MO_buy) * best_ask
             self.inventory += (MO_buy) - (MO_sell) 
         self.inventory += np.sum(arrivals * fills * [1, -1])
-        # TODO: clamp inventory to max_inventory
-        self.inventory = np.clip(self.inventory, -self.max_inventory, self.max_inventory)
-        depths = actions[0:2]  # [depthbid, depthask]
+        self.inventory = self._clip_and_warning(self.inventory, -self.max_inventory, self.max_inventory, cash_flag = False)
         if self.action_type == "touch":
-            self.cash += np.sum(arrivals * fills * (self.midprice_model.current_state + depths*self.half_spread)*[-1,1])
+            bidask = actions[0:2]  #[postedbid, postedask] for 'touch' action
+            self.cash += np.sum(arrivals * fills * (self.midprice_model.current_state + bidask*self.half_spread)*[-1,1])
         else:
+            depths = actions[0:2] #[depthbid, depthask] for 'limit'-type actions
             self.cash += np.sum(arrivals * fills * (self.midprice_model.current_state + depths)*[-1,1])
-        self.cash = np.clip(self.cash, -self.max_cash, self.max_cash)
+        self.cash = self._clip_and_warning(self.cash, -self.max_cash, self.max_cash, cash_flag = True)
         self.time += self.dt
         self.time = np.minimum(self.time, self.terminal_time)
         
-
+    def _clip_and_warning(self, not_clipped: float, min: float, max: float, cash_flag: bool) -> float:
+        clipped = np.clip(not_clipped, min, max)
+        if (not_clipped!=clipped) and cash_flag:
+            print(f"Clipping agent's cash from {not_clipped} to {clipped}.")
+        if (not_clipped!=clipped) and ~cash_flag:
+            print(f"Clipping agent's inventory from {not_clipped} to {clipped}.")
+        return clipped
+    
+        
     def reset_internal_state(self):
         self.state = self.initial_state  # TODO: do we need self.state? There is repetition.
         self.cash = self.initial_cash

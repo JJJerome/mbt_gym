@@ -7,160 +7,245 @@ from numpy.random import default_rng
 
 from pydantic import NonNegativeFloat
 
-from stochastic.processes.base import BaseProcess
-from stochastic.processes.continuous.brownian_motion import BrownianMotion
 
+class StochasticProcessModel(metaclass=abc.ABCMeta):
+    def __init__(
+        self,
+        min_value: np.ndarray,
+        max_value: np.ndarray,
+        step_size: float,
+        terminal_time: float,
+        initial_state: np.ndarray,
+        seed: int = None,
+    ):
+        self.min_value = min_value
+        self.max_value = max_value
+        self.step_size = step_size
+        self.terminal_time = terminal_time
+        self.initial_state = initial_state
+        self.current_state = initial_state
+        self.rng = default_rng(seed)
 
-class MidpriceModel(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def get_next_price(self, current_midprice: float):
+    def reset(self):
         pass
+
+    @abc.abstractmethod
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
+        pass
+
+
+MidpriceModel = StochasticProcessModel
+
+
+class FillProbabilityModel(StochasticProcessModel):
+    def __init__(
+        self, min_value: float, max_value: float, step_size: float, terminal_time: float, initial_state: float, seed: int = None,
+    ):
+        super().__init__(min_value, max_value, step_size, terminal_time, initial_state, seed)
+
+    @abc.abstractmethod
+    def get_fill_probabilities(self, depths: np.ndarray) -> np.ndarray:
+        pass
+
+    @abc.abstractmethod
+    def get_hypothetical_fills(self, depths: np.ndarray) -> np.ndarray:
+        unif = self.rng.uniform(size=2)
+        return unif < self.get_fill_probabilities(depths)
 
     @property
     @abc.abstractmethod
-    def max_value(self):
+    def max_depth(self) -> float:
         pass
 
 
-class FillProbabilityFunction(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
-    def calculate_fill_probability(self, spread: NonNegativeFloat) -> NonNegativeFloat:
-        pass
-
-
-class ArrivalModel(metaclass=abc.ABCMeta):  # TODO: generalise
-    @abc.abstractmethod
-    def calculate_next_arrival_rates(self) -> float:
-        pass
-
-    @abc.abstractmethod
-    def get_arrivals(self) -> float:
-        pass
-
-
-class StochasticMidpriceModel(MidpriceModel):
-    """A wrapper for the python package 'stochastic' to generate trajectories for a large class of processes"""
-
+class ArrivalModel(StochasticProcessModel):
     def __init__(
-        self, process: BaseProcess = None, initial_value: float = 1.0, is_multiplicative: bool = False, seed: Optional[int] = None
+        self, min_value: float, max_value: float, step_size: float, terminal_time: float, initial_state: float, seed: int = None,
     ):
-        self.process = process or BrownianMotion(rng=np.random.default_rng(seed), scale=2.0)  # As in Avellaneda-Stoikov
-        self.initial_value = initial_value
-        self.is_multiplicative = is_multiplicative
+        super().__init__(min_value, max_value, step_size, terminal_time, initial_state, seed)
 
-    def get_next_price(self, current_midprice: np.ndarray):
-        if self.is_multiplicative:
-            return self.process.sample_at(current_midprice, initial=self.initial_value)
-        else:
-            return self.process.sample_at(current_midprice) + self.initial_value
+    @abc.abstractmethod
+    def get_arrivals(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray) -> np.ndarray:
+        pass
+
+
+########################################################################################################################
+#             EXAMPLES                                                                                                 #
+########################################################################################################################
 
 
 class BrownianMotionMidpriceModel(MidpriceModel):
     def __init__(
         self,
         drift: float = 0.0,
-        volatility: float = 1.0,
+        volatility: float = 10.0,
         initial_price: float = 100,
-        dt: float = 0.1,
         terminal_time: float = 1.0,
+        step_size: float = 0.01,
         seed: Optional[int] = None,
     ):
         self.drift = drift
         self.volatility = volatility
-        self.initial_price = initial_price
-        self.dt = dt
         self.terminal_time = terminal_time
-        self.rng = default_rng(seed)
+        super().__init__(
+           min_value = initial_price - (self._get_max_value(initial_price, terminal_time) - initial_price), 
+           max_value = self._get_max_value(initial_price, terminal_time), 
+           step_size = step_size, 
+           terminal_time = terminal_time, 
+           initial_state = initial_price, 
+           seed = seed
+        )
+        
+    def reset(self):
+        self.current_state = self.initial_state
 
-    def get_next_price(self, current_midprice: np.ndarray):
-        return current_midprice + self.drift * self.dt + self.volatility * sqrt(self.dt) * self.rng.normal()
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> float:
+        self.current_state = (
+            self.current_state
+            + self.drift * self.step_size
+            + self.volatility * sqrt(self.step_size) * self.rng.normal()
+        )
 
-    @property
-    def max_value(self):
-        return self.initial_price + 4 * self.volatility * self.terminal_time
+    def _get_max_value(self, initial_price, terminal_time):
+        return initial_price + 4 * self.volatility * terminal_time
 
 
 class GeometricBrownianMotionMidpriceModel(MidpriceModel):
     def __init__(
         self,
         drift: float = 0.0,
-        volatility: float = 1.0,
+        volatility: float = 0.1,
         initial_price: float = 100,
-        dt: float = 0.1,
         terminal_time: float = 1.0,
+        step_size: float = 0.01,
         seed: Optional[int] = None,
     ):
         self.drift = drift
         self.volatility = volatility
-        self.initial_price = initial_price
-        self.dt = dt
-        self.terminal_time = terminal_time
-        self.rng = default_rng(seed)
+        super().__init__(
+           min_value = initial_price - (self._get_max_value(initial_price, terminal_time) - initial_price), 
+           max_value = self._get_max_value(initial_price, terminal_time), 
+           step_size = step_size, 
+           terminal_time = terminal_time, 
+           initial_state = initial_price, 
+           seed = seed
+        )
+        
+    def reset(self):
+        self.current_state = self.initial_state
 
-    def get_next_price(self, current_midprice: np.ndarray):
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> float:
         # Euler: current_midprice + self.drift * current_midprice * self.dt + self.volatility * current_midprice * sqrt(self.dt) * self.rng.normal()
-        return current_midprice*np.exp( (self.drift - self.volatility**2/2)*self.dt + self.volatility * sqrt(self.dt) * self.rng.normal() )
+        self.current_state = self.current_state * np.exp(
+            (self.drift - self.volatility ** 2 / 2) * self.step_size
+            + self.volatility * sqrt(self.step_size) * self.rng.normal()
+        )
+
+    def _get_max_value(self, initial_price, terminal_time):
+        stdev = sqrt(
+            initial_price ** 2
+            * np.exp(2 * self.drift * terminal_time)
+            * (np.exp(self.volatility ** 2 * terminal_time) - 1)
+        )
+        return initial_price * np.exp(self.drift * terminal_time) + 4 * stdev
+
+
+class ExponentialFillFunction(FillProbabilityModel):
+    def __init__(self, fill_exponent: float = 1.5, step_size: float = 0.1, seed: Optional[int] = None):
+        self.fill_exponent = fill_exponent
+        super().__init__(
+            min_value = np.array([]), 
+            max_value = np.array([]), 
+            step_size = step_size, 
+            terminal_time = np.array([]), 
+            initial_state = np.array([]), 
+            seed = seed
+        )
+
+    def get_fill_probabilities(self, depths: np.ndarray) -> np.ndarray:
+        return np.exp(-self.fill_exponent * depths)
+
+    def get_hypothetical_fills(self, depths: np.ndarray) -> np.ndarray:
+        unif = self.rng.uniform(size=2)
+        return unif < self.get_fill_probabilities(depths)
 
     @property
-    def max_value(self):
-        stdev = sqrt(self.initial_price**2 * np.exp(2*self.drift*self.terminal_time)*(np.exp(self.volatility**2*self.terminal_time) -1) )
-        return self.initial_price*np.exp(self.drift*self.terminal_time) + 4 * stdev
+    def max_depth(self) -> float:
+        return -np.log(0.01) / self.fill_exponent
 
+    def reset(self):
+        pass
 
-class ExponentialFillFunction(FillProbabilityFunction):
-    def __init__(self, fill_exponent: float = 1.5, seed: Optional[int] = None):
-        self.fill_exponent = fill_exponent
-        self.rng = default_rng(seed)
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray):
+        pass
 
-    def calculate_fill_probability(self, half_spread: NonNegativeFloat) -> NonNegativeFloat:
-        return np.exp(-self.fill_exponent * half_spread)
-
-    def get_fill(self, half_spread: NonNegativeFloat) -> NonNegativeFloat:
-        unif = self.rng.uniform()
-        return unif < self.calculate_fill_probability(half_spread)
 
 
 class PoissonArrivalModel(ArrivalModel):
-    def __init__(
-        self, intensity: float = 100, 
-        seed: Optional[int] = None
-    ):
+    def __init__(self, intensity: np.ndarray = np.array([100., 100.]), step_size: float = 0.01, seed: Optional[int] = None):
         self.intensity = intensity
-        self.rng = default_rng(seed)
+        super().__init__(
+            min_value = np.array([]), 
+            max_value = np.array([]), 
+            step_size = step_size, 
+            terminal_time = np.array([]), 
+            initial_state = np.array([]), 
+            seed = seed
+        )
 
-    def calculate_next_arrival_rates(self) -> float:
-        return self.intensity
+    def update(
+        self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray):
+        pass
 
-    def get_arrivals(self, interval_length:float) -> float:
+    def reset(self):
+        pass       
+
+    def get_arrivals(self) -> np.ndarray:
         unif = self.rng.uniform(size=2)
-        return unif < self.intensity * interval_length
+        return unif < self.intensity * self.step_size
 
 
 class HawkesArrivalModel(ArrivalModel):
     def __init__(
-        self, 
-        baseline_arrival_rate: float = 100, 
-        alpha: float = 2, 
-        beta: float = 0.5, 
-        time_horizon: float = 1,
-        seed: Optional[int] = None
+        self,
+        baseline_arrival_rate: np.ndarray = np.array([100., 100.]),
+        step_size: float = 0.01,
+        alpha: float = 2,
+        beta: float = 0.5,
+        terminal_time: float = 1,
+        seed: Optional[int] = None,
     ):
         self.baseline_arrival_rate = baseline_arrival_rate
         self.alpha = alpha  # see https://arxiv.org/pdf/1507.02822.pdf, equation (4).
         self.beta = beta
-        self.time_horizon = time_horizon
-        self.rng = default_rng(seed)
+        super().__init__(
+            min_value = np.array([0, 0]), 
+            max_value = self._get_max_arrival_rate(), 
+            step_size = step_size, 
+            terminal_time = terminal_time, 
+            initial_state = baseline_arrival_rate, 
+            seed = seed
+        )
 
-    def calculate_next_arrival_rates(self, intensities:np.ndarray, arrivals:float, interval_length:float) -> float:
-        next_intensities = ( intensities
-            + self.beta * (self.baseline_arrival_rate - intensities) * interval_length
-            + self.alpha * arrivals )
-        return next_intensities
+    def reset(self):
+        self.current_state = self.baseline_arrival_rate
 
-    def get_arrivals(self, intensities:np.ndarray, interval_length:float) -> float:
+    def update(
+        self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray
+    ) -> np.ndarray:
+        self.current_state = (
+            self.current_state
+            + self.beta * (self.baseline_arrival_rate - self.current_state) * self.step_size
+            + self.alpha * arrivals
+        )
+        return self.current_state
+
+    def get_arrivals(self) -> np.ndarray:
         unif = self.rng.uniform(size=2)
-        return unif < intensities * interval_length
-    
-    @property
-    def get_max_arrival_rate(self):
-        return self.baseline_arrival_rate * 10 # TODO: Improve this with 4*std
+        return unif < self.current_state * self.step_size
+
+    def _get_max_arrival_rate(self):
+        return self.baseline_arrival_rate * 10  # TODO: Improve this with 4*std
+
+    # TODO: https://math.stackexchange.com/questions/4047342/expectation-of-hawkes-process-with-exponential-kernel

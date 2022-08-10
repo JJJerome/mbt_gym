@@ -12,7 +12,7 @@ from DRL4AMM.rewards.RewardFunctions import RewardFunction, PnL
 from DRL4AMM.gym.probability_models import (
     MidpriceModel,
     StochasticMidpriceModel,
-    FillProbabilityFunction,
+    FillProbabilityModel,
     ExponentialFillFunction,
     ArrivalModel,
     PoissonArrivalModel,
@@ -28,7 +28,7 @@ class ModelBasedEnvironment(gym.Env):
         n_steps: int = 100,
         midprice_model: MidpriceModel = None,
         arrival_model: ArrivalModel = None,
-        fill_probability_function: FillProbabilityFunction = None,
+        fill_probability_function: FillProbabilityModel = None,
         reward_function: RewardFunction = None,
         initial_cash: float = 0.0,
         initial_inventory: int = 0,
@@ -52,15 +52,13 @@ class ModelBasedEnvironment(gym.Env):
         self.action_space = Box(low=0.0, high=np.inf, shape=(2,))  # agent chooses spread on bid and ask
         # observation space is (stock_price, cash, inventory, time)
         self.observation_space = Box(
-            low=np.zeros(4),
-            high=np.array([np.inf, np.inf, self.max_inventory, terminal_time]),
-            dtype=np.float64,
+            low=np.zeros(4), high=np.array([np.inf, np.inf, self.max_inventory, terminal_time]), dtype=np.float64,
         )
         self.obs: np.ndarray = self.observation_space.sample()
         self.trajectory: Iterator = iter([])
 
     def reset(self):
-        self.trajectory = iter(self.midprice_model.get_next_price(self.timestamps))
+        self.trajectory = iter(self.midprice_model.update_midprice())
         self.obs = np.array([next(self.trajectory), self.initial_cash, self.initial_inventory, 0])
         return self.obs
 
@@ -80,7 +78,7 @@ class ModelBasedEnvironment(gym.Env):
         next_obs[3] += self.dt
         fill_prob_bid, fill_prob_ask = [
             self.arrival_model.calculate_next_arrival_rate(self.dt)
-            * self.fill_probability_function.calculate_fill_probability(a)
+            * self.fill_probability_function.get_fill_probabilities(a)
             for a in action
         ]
         unif_bid, unif_ask = self.rng.random(2)

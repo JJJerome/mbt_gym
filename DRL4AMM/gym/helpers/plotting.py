@@ -14,9 +14,9 @@ def plot_as_trajectory(env: gym.Env, agent: Agent, seed: int = None):
     observations, actions, rewards = generate_trajectory(env, agent, seed)
     cum_rewards = np.cumsum(rewards)
     observations = np.array(observations)
-    asset_prices = observations[:, 0]
-    cash_holdings = observations[:, 1]
-    inventory = observations[:, 2]
+    cash_holdings = observations[:, 0]
+    inventory = observations[:, 1]
+    asset_prices = observations[:, 3]
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(20, 10))
     ax1.title.set_text("cum_rewards")
     ax2.title.set_text("asset_prices")

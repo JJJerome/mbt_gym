@@ -12,10 +12,10 @@ class SBAgent(Agent):
         self.model = model
         self.reduced_training = reduced_training
 
-    def get_action(self, state: np.ndarray) -> Action:
+    def get_action(self, state: np.ndarray) -> np.ndarray:
         if self.reduced_training:
             state = state[-2:]
-        return Action(*np.reshape(self.model.predict(state)[0], 2))
+        return np.reshape(self.model.predict(state)[0], 2)
 
     def train(self, total_timesteps: int = 100000):
         self.model.learn(total_timesteps=total_timesteps)

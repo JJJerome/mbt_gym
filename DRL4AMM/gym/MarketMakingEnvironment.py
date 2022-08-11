@@ -32,7 +32,7 @@ class MarketMakingEnvironment(gym.Env):
         action_type: str = "limit",
         initial_cash: float = 0.0,
         initial_inventory: int = 0,
-        max_inventory: int = 100,
+        max_inventory: int = 10_000,
         max_cash: float = None,
         max_stock_price: float = None,
         max_depth: float = None,
@@ -47,6 +47,7 @@ class MarketMakingEnvironment(gym.Env):
         self.arrival_model: ArrivalModel = arrival_model or PoissonArrivalModel()
         self.midprice_model: MidpriceModel = midprice_model or BrownianMotionMidpriceModel()
         self.fill_probability_model: FillProbabilityModel = fill_probability_model or ExponentialFillFunction()
+        assert action_type in ["limit", "limit_and_market", "touch"]
         self.action_type = action_type
         self.initial_cash = initial_cash
         self.initial_inventory = initial_inventory
@@ -76,7 +77,7 @@ class MarketMakingEnvironment(gym.Env):
     def step(self, actions: np.ndarray):
         current_state = self.state
         next_state = self._update_state(actions)
-        done = isclose(next_state[3], self.terminal_time)  # due to floating point arithmetic
+        done = isclose(next_state[2], self.terminal_time)  # due to floating point arithmetic
         reward = self.reward_function.calculate(current_state, actions, next_state, done)
         return self.state, reward, done, {}
 
@@ -85,7 +86,7 @@ class MarketMakingEnvironment(gym.Env):
 
     def _get_max_cash(self) -> float:
         return self.max_inventory * self.max_stock_price
-    
+
     # actions = [bid_depth, ask_depth, MO_buy, MO_sell]
     # state[0]=cash, state[1]=inventory, state[2]=time, then remaining states depend on dimensionality of the arrival
     # process, the midprice process and the fill probability process.
@@ -97,7 +98,7 @@ class MarketMakingEnvironment(gym.Env):
         self.midprice_model.update(arrivals, fills, actions)  # TODO
         self.fill_probability_model.update(arrivals, fills, actions)  # TODO
         self._update_cash_and_inventory(arrivals, fills, actions)  # TODO
-        self.state = np.array([self.cash, self.inventory, self.time],dtype=np.float32)
+        self.state = np.array([self.cash, self.inventory, self.time], dtype=np.float32)
         self.state = np.append(self.state, self.arrival_model.current_state)
         self.state = np.append(self.state, self.midprice_model.current_state)
         self.state = np.append(self.state, self.fill_probability_model.current_state)
@@ -107,35 +108,39 @@ class MarketMakingEnvironment(gym.Env):
         if self.action_type == "limit_and_market":
             MO_buy = float(actions[2] > 0.5)
             MO_sell = float(actions[3] > 0.5)
-            best_bid = self.midprice_model.current_state-self.market_order_penalty
-            best_ask = self.midprice_model.current_state+self.market_order_penalty
+            best_bid = self.midprice_model.current_state - self.market_order_penalty
+            best_ask = self.midprice_model.current_state + self.market_order_penalty
             self.cash += (MO_sell) * (best_bid) - (MO_buy) * best_ask
-            self.inventory += (MO_buy) - (MO_sell) 
+            self.inventory += (MO_buy) - (MO_sell)
         self.inventory += np.sum(arrivals * fills * [1, -1])
-        self.inventory = self._clip_and_warning(self.inventory, -self.max_inventory, self.max_inventory, cash_flag = False)
+        self.inventory = self._clip_and_warning(
+            self.inventory, -self.max_inventory, self.max_inventory, cash_flag=False
+        )
         if self.action_type == "touch":
-            bidask = actions[0:2]  #[postedbid, postedask] for 'touch' action
-            self.cash += np.sum(arrivals * fills * (self.midprice_model.current_state + bidask*self.half_spread)*[-1,1])
+            bidask = actions[0:2]  # [postedbid, postedask] for 'touch' action
+            self.cash += np.sum(
+                arrivals * fills * (self.midprice_model.current_state + bidask * self.half_spread) * [-1, 1]
+            )
         else:
-            depths = actions[0:2] #[depthbid, depthask] for 'limit'-type actions
-            self.cash += np.sum(arrivals * fills * (self.midprice_model.current_state + depths)*[-1,1])
-        self.cash = self._clip_and_warning(self.cash, -self.max_cash, self.max_cash, cash_flag = True)
+            depths = actions[0:2]  # [depthbid, depthask] for 'limit'-type actions
+            self.cash += np.sum(arrivals * fills * (self.midprice_model.current_state + depths) * [-1, 1])
+        self.cash = self._clip_and_warning(self.cash, -self.max_cash, self.max_cash, cash_flag=True)
         self.time += self.dt
         self.time = np.minimum(self.time, self.terminal_time)
-        
+
     def _clip_and_warning(self, not_clipped: float, min: float, max: float, cash_flag: bool) -> float:
         clipped = np.clip(not_clipped, min, max)
-        if (not_clipped!=clipped) and cash_flag:
+        if (not_clipped != clipped) and cash_flag:
             print(f"Clipping agent's cash from {not_clipped} to {clipped}.")
-        if (not_clipped!=clipped) and ~cash_flag:
+        if (not_clipped != clipped) and ~cash_flag:
             print(f"Clipping agent's inventory from {not_clipped} to {clipped}.")
         return clipped
-    
-        
+
     def reset_internal_state(self):
         self.state = self.initial_state  # TODO: do we need self.state? There is repetition.
         self.cash = self.initial_cash
         self.inventory = self.initial_inventory
+        self.time = 0.0
 
     def _get_initial_state(self) -> np.ndarray:
         state = np.array([self.initial_cash, self.initial_inventory, 0])
@@ -156,7 +161,11 @@ class MarketMakingEnvironment(gym.Env):
         high = np.append(high, self.arrival_model.max_value)
         high = np.append(high, self.midprice_model.max_value)
         high = np.append(high, self.fill_probability_model.max_value)
-        return Box(low=low, high=high, dtype=np.float64,)
+        return Box(
+            low=low,
+            high=high,
+            dtype=np.float64,
+        )
 
     def _get_action_space(self) -> gym.spaces.Space:
         assert self.action_type in ACTION_SPACES, f"Action type {self.action_type} is not in {ACTION_SPACES}."
@@ -167,7 +176,13 @@ class MarketMakingEnvironment(gym.Env):
             return gym.spaces.Box(low=0.0, high=max_depth, shape=(2,))  # agent chooses spread on bid and ask
         if self.action_type == "limit_and_market":
             max_depth = self.fill_probability_model.max_depth
-            return gym.spaces.Box(low=np.zeros(4,), high=np.array(max_depth, max_depth, 1, 1), shape=(2,),)
+            return gym.spaces.Box(
+                low=np.zeros(
+                    4,
+                ),
+                high=np.array(max_depth, max_depth, 1, 1),
+                shape=(2,),
+            )
 
     @staticmethod
     def _get_max_depth():

@@ -26,8 +26,8 @@ class MarketMakingEnvironment(gym.Env):
         terminal_time: float = 30.0,
         n_steps: int = 30 * 10,
         reward_function: RewardFunction = None,
-        arrival_model: ArrivalModel = None,
         midprice_model: MidpriceModel = None,
+        arrival_model: ArrivalModel = None,
         fill_probability_model: FillProbabilityModel = None,
         action_type: str = "limit",
         initial_cash: float = 0.0,
@@ -44,8 +44,8 @@ class MarketMakingEnvironment(gym.Env):
         self.terminal_time = terminal_time
         self.n_steps = n_steps
         self.reward_function = reward_function or CJ_criterion(phi=2 * 10 ** (-4), alpha=0.0001)
-        self.arrival_model: ArrivalModel = arrival_model or PoissonArrivalModel()
         self.midprice_model: MidpriceModel = midprice_model or BrownianMotionMidpriceModel()
+        self.arrival_model: ArrivalModel = arrival_model or PoissonArrivalModel()
         self.fill_probability_model: FillProbabilityModel = fill_probability_model or ExponentialFillFunction()
         assert action_type in ["limit", "limit_and_market", "touch"]
         self.action_type = action_type

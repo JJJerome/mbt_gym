@@ -45,7 +45,7 @@ env_params = dict(terminal_time=terminal_time,
 
 mm_env = MarketMakingEnvironment(**env_params)
 reduced_env = ReduceStateSizeWrapper(mm_env)
-n_envs = 14
+n_envs = 10
 gym.envs.register(id="mm-env-v0", entry_point="__main__:MarketMakingEnvironment", kwargs=env_params)
 vec_env = make_vec_env(env_id="mm-env-v0", n_envs=n_envs, wrapper_class=ReduceStateSizeWrapper)
 

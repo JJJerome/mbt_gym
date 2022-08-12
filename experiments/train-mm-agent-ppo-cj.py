@@ -53,7 +53,7 @@ policy_kwargs = dict(net_arch=[dict(pi=[32, 32], vf=[64, 64])])
 PPO_params = {"policy":'MlpPolicy', "env": vec_env, "verbose":1,
               "policy_kwargs":policy_kwargs,
               "tensorboard_log":tensorboard_logdir,
-              "batch_size": 20000, "learning_rate": schedule} #256 before (batch size)
+              "batch_size": n_envs * 2048, "learning_rate": schedule} #256 before (batch size)
 callback_params = dict(eval_env=reduced_env, n_eval_episodes = 10000, #200 before  (n_eval_episodes)
                        best_model_save_path = best_model_path,
                        deterministic=True)

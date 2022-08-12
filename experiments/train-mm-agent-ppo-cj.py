@@ -2,6 +2,9 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.env_util import make_vec_env
 
+import sys
+sys.path.append("../")
+
 from DRL4AMM.gym.wrappers import *
 from DRL4AMM.gym.MarketMakingEnvironment import MarketMakingEnvironment
 from DRL4AMM.rewards.RewardFunctions import CJ_criterion
@@ -50,7 +53,7 @@ policy_kwargs = dict(net_arch=[dict(pi=[32, 32], vf=[64, 64])])
 PPO_params = {"policy":'MlpPolicy', "env": vec_env, "verbose":1,
               "policy_kwargs":policy_kwargs,
               "tensorboard_log":tensorboard_logdir,
-              "batch_size": 10000, "learning_rate": schedule} #256 before (batch size)
+              "batch_size": 20000, "learning_rate": schedule} #256 before (batch size)
 callback_params = dict(eval_env=reduced_env, n_eval_episodes = 10000, #200 before  (n_eval_episodes)
                        best_model_save_path = best_model_path,
                        deterministic=True)
@@ -60,4 +63,5 @@ model = PPO(**PPO_params, device="cpu")
 
 model.learning_rate = linear_schedule(0.000001)
 
-model.learn(total_timesteps = 3_000_000, callback=callback)
+model.learn(total_timesteps = 10_000_000, callback=callback)
+

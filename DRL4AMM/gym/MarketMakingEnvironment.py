@@ -1,4 +1,4 @@
-from xmlrpc.client import boolean
+from copy import copy
 import gym
 import numpy as np
 
@@ -63,22 +63,21 @@ class MarketMakingEnvironment(gym.Env):
         self.observation_space = self._get_observation_space()
         self.action_space = self._get_action_space()
         self.time = 0.0
-        self.state = self._get_initial_state()
-        self.market_order_penalty = market_order_penalty
+        self.book_half_spread = market_order_penalty
         self.half_spread = half_spread
 
     def reset(self):
-        self.reset_internal_state()
-        self.arrival_model.reset()
+        self._reset_agent_state()
         self.midprice_model.reset()
+        self.arrival_model.reset()
         self.fill_probability_model.reset()
         return self.state
 
-    def step(self, actions: np.ndarray):
-        current_state = self.state
-        next_state = self._update_state(actions)
-        done = isclose(next_state[2], self.terminal_time)  # due to floating point arithmetic
-        reward = self.reward_function.calculate(current_state, actions, next_state, done, self.asset_price_index)
+    def step(self, action: np.ndarray):
+        current_state = copy(self.state)
+        next_state = self._update_state(action)
+        done = isclose(self.time, self.terminal_time)  # due to floating point arithmetic
+        reward = self.reward_function.calculate(current_state, action, next_state, done)
         return self.state, reward, done, {}
 
     def render(self, mode="human"):
@@ -87,48 +86,59 @@ class MarketMakingEnvironment(gym.Env):
     def _get_max_cash(self) -> float:
         return self.max_inventory * self.max_stock_price
 
-    # actions = [bid_depth, ask_depth, MO_buy, MO_sell]
-    # state[0]=cash, state[1]=inventory, state[2]=time, then remaining states depend on dimensionality of the arrival
-    # process, the midprice process and the fill probability process.
-    def _update_state(self, actions: np.ndarray) -> np.ndarray:
-        arrivals = self.arrival_model.get_arrivals()  # [arrivebid, arriveask]
-        depths = actions[0:2]  # [depthbid, depthask]
-        fills = self.fill_probability_model.get_hypothetical_fills(depths)  # [fillbid, fillask]
-        self.arrival_model.update(arrivals, fills, actions)  # TODO
-        self.midprice_model.update(arrivals, fills, actions)  # TODO
-        self.fill_probability_model.update(arrivals, fills, actions)  # TODO
-        self._update_cash_and_inventory(arrivals, fills, actions)  # TODO
-        self.state = np.array([self.cash, self.inventory, self.time], dtype=np.float32)
-        self.state = np.append(self.state, self.arrival_model.current_state)
-        self.state = np.append(self.state, self.midprice_model.current_state)
-        self.state = np.append(self.state, self.fill_probability_model.current_state)
+    # action = [bid_depth, ask_depth, MO_buy, MO_sell]
+    # state[0]=cash, state[1]=inventory, state[2]=time, state[3] = asset_price, and then remaining states depend on
+    # the dimensionality of the arrival process, the midprice process and the fill probability process.
+    def _update_state(self, action: np.ndarray) -> np.ndarray:
+        arrivals = self.arrival_model.get_arrivals()
+        if self.action_type in ["limit", "limit_and_market"]:
+            depths = np.array([self.limit_buy_depth(action), self.limit_sell_depth(action)])
+            fills = self.fill_probability_model.get_hypothetical_fills(depths)
+        else:
+            fills = np.array([self.post_buy_at_touch(action), self.post_sell_at_touch(action)])
+        self.arrival_model.update(arrivals, fills, action)  # TODO
+        self.midprice_model.update(arrivals, fills, action)  # TODO
+        self.fill_probability_model.update(arrivals, fills, action)  # TODO
+        self._update_agent_state(arrivals, fills, action)  # TODO
         return self.state
 
-    def _update_cash_and_inventory(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray):
+    def _update_agent_state(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
+        fill_multiplier = np.array([-1, 1])
         if self.action_type == "limit_and_market":
-            MO_buy = float(actions[2] > 0.5)
-            MO_sell = float(actions[3] > 0.5)
-            best_bid = self.midprice_model.current_state - self.market_order_penalty
-            best_ask = self.midprice_model.current_state + self.market_order_penalty
-            self.cash += (MO_sell) * (best_bid) - (MO_buy) * best_ask
-            self.inventory += (MO_buy) - (MO_sell)
-        self.inventory += np.sum(arrivals * fills * [1, -1])
-        self.inventory = self._clip(self.inventory, -self.max_inventory, self.max_inventory, cash_flag=False)
+            mo_buy = float(self.market_order_buy(action) > 0.5)
+            mo_sell = float(self.market_order_sell(action) > 0.5)
+            best_bid = self.midprice_model.current_state - self.book_half_spread
+            best_ask = self.midprice_model.current_state + self.book_half_spread
+            self.cash += mo_sell * best_bid - mo_buy * best_ask
+            self.inventory += mo_buy - mo_sell
+        self.inventory += np.sum(arrivals * fills * -fill_multiplier)
         if self.action_type == "touch":
-            bidask = actions[0:2]  # [postedbid, postedask] for 'touch' action
+            posted = np.array([self.post_buy_at_touch(action), self.post_sell_at_touch(action)])
             self.cash += np.sum(
-                arrivals * fills * (self.midprice_model.current_state + bidask * self.half_spread) * [-1, 1]
+                fill_multiplier * arrivals * fills * (self.midprice + self.book_half_spread * fill_multiplier)
             )
         else:
-            depths = actions[0:2]  # [depthbid, depthask] for 'limit'-type actions
-            self.cash += np.sum(arrivals * fills * (self.midprice_model.current_state + depths) * [-1, 1])
-        self.cash = self._clip(self.cash, -self.max_cash, self.max_cash, cash_flag=True)
+            depths = np.array([self.limit_buy_depth(action), self.limit_sell_depth(action)])
+            self.cash += np.sum(fill_multiplier * arrivals * fills * (self.midprice + depths * fill_multiplier))
+        self._clip_inventory_and_cash()
         self.time += self.dt
         self.time = np.minimum(self.time, self.terminal_time)
 
     @property
-    def asset_price_index(self):
-        return 3 + len(self.arrival_model.initial_state)
+    def state(self):
+        state = np.array([self.cash, self.inventory, self.time])
+        state = np.append(state, self.midprice_model.current_state)
+        state = np.append(state, self.arrival_model.current_state)
+        state = np.append(state, self.fill_probability_model.current_state)
+        return state
+
+    @property
+    def midprice(self):
+        return self.midprice_model.current_state[0]
+
+    def _clip_inventory_and_cash(self):
+        self.inventory = self._clip(self.inventory, -self.max_inventory, self.max_inventory, cash_flag=False)
+        self.cash = self._clip(self.cash, -self.max_cash, self.max_cash, cash_flag=True)
 
     def _clip(self, not_clipped: float, min: float, max: float, cash_flag: bool) -> float:
         clipped = np.clip(not_clipped, min, max)
@@ -138,16 +148,51 @@ class MarketMakingEnvironment(gym.Env):
             print(f"Clipping agent's inventory from {not_clipped} to {clipped}.")
         return clipped
 
-    def reset_internal_state(self):
-        self.state = self.initial_state  # TODO: do we need self.state? There is repetition.
+    def limit_buy_depth(self, action: np.ndarray):
+        if self.action_type in ["limit", "limit_and_market"]:
+            return action[0]
+        else:
+            raise Exception('Bid depth only exists for action_type in ["limit", "limit_and_market"].')
+
+    def limit_sell_depth(self, action: np.ndarray):
+        if self.action_type in ["limit", "limit_and_market"]:
+            return action[1]
+        else:
+            raise Exception('Ask depth only exists for action_type in ["limit", "limit_and_market"].')
+
+    def market_order_buy(self, action: np.ndarray):
+        if self.action_type == "limit_and_market":
+            return action[2]
+        else:
+            raise Exception('Market order buy action only exists for action_type == "limit_and_market".')
+
+    def market_order_sell(self, action: np.ndarray):
+        if self.action_type == "limit_and_market":
+            return action[3]
+        else:
+            raise Exception('Market order sell action only exists for action_type == "limit_and_market".')
+
+    def post_buy_at_touch(self, action: np.ndarray):
+        if self.action_type == "touch":
+            return action[0]
+        else:
+            raise Exception('Post buy at touch action only exists for action_type == "touch".')
+
+    def post_sell_at_touch(self, action: np.ndarray):
+        if self.action_type == "touch":
+            return action[1]
+        else:
+            raise Exception('Post buy at touch action only exists for action_type == "touch".')
+
+    def _reset_agent_state(self):
         self.cash = self.initial_cash
         self.inventory = self.initial_inventory
         self.time = 0.0
 
     def _get_initial_state(self) -> np.ndarray:
         state = np.array([self.initial_cash, self.initial_inventory, 0])
-        state = np.append(state, self.arrival_model.initial_state)
         state = np.append(state, self.midprice_model.initial_state)
+        state = np.append(state, self.arrival_model.initial_state)
         state = np.append(state, self.fill_probability_model.initial_state)
         return state
 

@@ -66,6 +66,11 @@ class FillProbabilityModel(StochasticProcessModel):
 
 
 class ArrivalModel(StochasticProcessModel):
+    """ArrivalModel models the arrival of orders to the order book. The first entry of arrivals represents an arrival
+    of an exogenous SELL order (arriving on the buy side of the book) and the second entry represents an arrival of an
+    exogenous BUY order (arriving on the sell side of the book).
+    """
+
     def __init__(
         self,
         min_value: float,
@@ -105,7 +110,7 @@ class BrownianMotionMidpriceModel(MidpriceModel):
             max_value=self._get_max_value(initial_price, terminal_time),
             step_size=step_size,
             terminal_time=terminal_time,
-            initial_state=initial_price,
+            initial_state=np.array([initial_price]),
             seed=seed,
         )
 
@@ -113,10 +118,8 @@ class BrownianMotionMidpriceModel(MidpriceModel):
         self.current_state = self.initial_state
 
     def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> float:
-        self.current_state = (
-            self.current_state
-            + self.drift * self.step_size
-            + self.volatility * sqrt(self.step_size) * self.rng.normal()
+        self.current_state = self.current_state + np.array(
+            [self.drift * self.step_size + self.volatility * sqrt(self.step_size) * self.rng.normal()]
         )
 
     def _get_max_value(self, initial_price, terminal_time):

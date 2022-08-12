@@ -143,7 +143,7 @@ class AvellanedaStoikovEnvironment(gym.Env):
     ):  # TODO: update for Hawkes.
         return (
             initial_cash + 3 * baseline_arrival_rate * terminal_time * initial_stock_price
-        )  # TODO: https://math.stackexchange.com/questions/4047342/expectation-of-hawkes-process-with-exponential-kernel
+        )  # TODO:https://math.stackexchange.com/questions/4047342/expectation-of-hawkes-process-with-exponential-kernel
 
     @staticmethod
     def _clamp(probability):

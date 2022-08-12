@@ -12,23 +12,23 @@ from DRL4AMM.rewards.RewardFunctions import RewardFunction, CJ_criterion
 
 class VectorizedAvellanedaStoikov(VectorEnv):
     def __init__(
-            self,
-            terminal_time: float = 30.0,
-            n_steps: int = 30 * 10,
-            reward_function: RewardFunction = None,
-            drift: float = 0.0,
-            volatility: float = 0.01,
-            arrival_rate: float = 1.0,
-            fill_exponent: float = 100.0,
-            initial_cash: float = 0.0,
-            initial_inventory: int = 0,
-            initial_stock_price: float = 100.0,
-            max_inventory: int = 100,
-            max_cash: float = None,
-            max_stock_price: float = None,
-            max_half_spread: float = 4.0,
-            seed: int = None,
-            num_envs: int = 1000
+        self,
+        terminal_time: float = 30.0,
+        n_steps: int = 30 * 10,
+        reward_function: RewardFunction = None,
+        drift: float = 0.0,
+        volatility: float = 0.01,
+        arrival_rate: float = 1.0,
+        fill_exponent: float = 100.0,
+        initial_cash: float = 0.0,
+        initial_inventory: int = 0,
+        initial_stock_price: float = 100.0,
+        max_inventory: int = 100,
+        max_cash: float = None,
+        max_stock_price: float = None,
+        max_half_spread: float = 4.0,
+        seed: int = None,
+        num_envs: int = 1000,
     ):
         self.terminal_time = terminal_time
         self.n_steps = n_steps
@@ -42,7 +42,9 @@ class VectorizedAvellanedaStoikov(VectorEnv):
         self.initial_stock_price = initial_stock_price
         self.max_inventory = max_inventory
         self.max_cash = max_cash or self.get_max_cash(initial_cash, initial_stock_price, arrival_rate, terminal_time)
-        self.max_stock_price = max_stock_price or self.get_max_stock_price(initial_stock_price, volatility, terminal_time)
+        self.max_stock_price = max_stock_price or self.get_max_stock_price(
+            initial_stock_price, volatility, terminal_time
+        )
         self.max_half_spread = max_half_spread
         self.rng = np.random.default_rng(seed)
         self.num_envs = num_envs
@@ -62,9 +64,8 @@ class VectorizedAvellanedaStoikov(VectorEnv):
 
     @override(VectorEnv)
     def vector_reset(self):
-        self.state = torch.cat(torch.ones(n))
-            torch.tensor()
-        paths, bid_arrivals, ask_arrivals, rand_fill = get_randomness(env, nsims)
+        # self.state = torch.cat(torch.ones(n))
+        # paths, bid_arrivals, ask_arrivals, rand_fill = get_randomness(env, nsims)
 
         pass
 
@@ -72,18 +73,18 @@ class VectorizedAvellanedaStoikov(VectorEnv):
         self.state = np.array([self.initial_stock_price, self.initial_cash, self.initial_inventory, 0])
         return self.state
 
-
     @override(VectorEnv)
     def vector_step(self, actions):
         pass
 
-
-
     def generate_prices(self):
-        brownian_motion = torch.cat((torch.zeros((1, self.num_envs)), sqrt(self.volatility * self.dt) * torch.randn((self.n - 1, nsims)).cumsum(dim=0)),
-                                 dim=0)
-
-        bm = self.s0 +
+        brownian_motion = torch.cat(
+            (
+                torch.zeros((1, self.num_envs)),
+                sqrt(self.volatility * self.dt) * torch.randn((self.n - 1, nsims)).cumsum(dim=0),
+            ),
+            dim=0,
+        )
 
         bm = torch.reshape(bm, (self.n, nsims))
         time = torch.reshape(torch.linspace(0, self.T, self.n), (self.n, 1))
@@ -91,24 +92,12 @@ class VectorizedAvellanedaStoikov(VectorEnv):
         path[:, 1] += self.drift * path[:, 0]
         return path
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         @staticmethod
-        def get_max_cash(initial_cash:float, initial_stock_price:float, arrival_rate:float, terminal_time:float) -> float:
+        def get_max_cash(
+            initial_cash: float, initial_stock_price: float, arrival_rate: float, terminal_time: float
+        ) -> float:
             return initial_cash + arrival_rate * terminal_time * initial_stock_price * 5.0
 
         @staticmethod
-        def get_max_stock_price(initial_stock_price:float, volatility:float, terminal_time:float) -> float:
+        def get_max_stock_price(initial_stock_price: float, volatility: float, terminal_time: float) -> float:
             return initial_stock_price + 4 * terminal_time * volatility

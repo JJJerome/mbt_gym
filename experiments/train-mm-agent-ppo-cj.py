@@ -63,5 +63,5 @@ model = PPO(**PPO_params, device="cpu")
 
 model.learning_rate = linear_schedule(0.000001)
 
-model.learn(total_timesteps = 10_000_000, callback=callback)
+model.learn(total_timesteps = 50_000_000, callback=callback)
 

@@ -23,8 +23,8 @@ class MarketMakingEnvironment(gym.Env):
 
     def __init__(
         self,
-        terminal_time: float = 30.0,
-        n_steps: int = 30 * 10,
+        terminal_time: float = 1.0,
+        n_steps: int = 20 * 10,
         reward_function: RewardFunction = None,
         midprice_model: MidpriceModel = None,
         arrival_model: ArrivalModel = None,

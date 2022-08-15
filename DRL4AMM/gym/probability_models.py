@@ -96,7 +96,7 @@ class BrownianMotionMidpriceModel(MidpriceModel):
     def __init__(
         self,
         drift: float = 0.0,
-        volatility: float = 10.0,
+        volatility: float = 2.0,
         initial_price: float = 100,
         terminal_time: float = 1.0,
         step_size: float = 0.01,
@@ -198,7 +198,7 @@ class ExponentialFillFunction(FillProbabilityModel):
 
 class PoissonArrivalModel(ArrivalModel):
     def __init__(
-        self, intensity: np.ndarray = np.array([100.0, 100.0]), step_size: float = 0.01, seed: Optional[int] = None
+        self, intensity: np.ndarray = np.array([140.0, 140.0]), step_size: float = 0.01, seed: Optional[int] = None
     ):
         self.intensity = intensity
         super().__init__(

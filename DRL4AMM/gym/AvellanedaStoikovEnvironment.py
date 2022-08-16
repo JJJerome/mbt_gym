@@ -6,7 +6,7 @@ from gym.spaces import Box
 from math import sqrt, isclose
 
 from DRL4AMM.gym.models import Action
-from DRL4AMM.rewards.RewardFunctions import RewardFunction, CJ_criterion
+from DRL4AMM.rewards.RewardFunctions import RewardFunction, CjCriterion
 
 
 class AvellanedaStoikovEnvironment(gym.Env):
@@ -34,7 +34,7 @@ class AvellanedaStoikovEnvironment(gym.Env):
         super(AvellanedaStoikovEnvironment, self).__init__()
         self.terminal_time = terminal_time
         self.n_steps = n_steps
-        self.reward_function = reward_function or CJ_criterion(phi=2 * 10 ** (-4), alpha=0.0001)
+        self.reward_function = reward_function or CjCriterion(phi=2 * 10 ** (-4), alpha=0.0001)
         self.drift = drift
         self.volatility = volatility
         self.arrival_rate = arrival_rate

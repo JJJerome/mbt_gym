@@ -26,7 +26,7 @@ class PnL(RewardFunction):
 
 
 # observation space is (stock_price, cash, inventory, time)
-class CJ_criterion(RewardFunction):
+class CjCriterion(RewardFunction):
     def __init__(self, phi: NonNegativeFloat = 0.01, alpha: NonNegativeFloat = 0.01):
         self.phi = phi
         self.alpha = alpha

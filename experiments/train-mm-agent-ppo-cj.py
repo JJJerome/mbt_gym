@@ -7,7 +7,7 @@ sys.path.append("../")
 
 from DRL4AMM.gym.wrappers import *
 from DRL4AMM.gym.MarketMakingEnvironment import MarketMakingEnvironment
-from DRL4AMM.rewards.RewardFunctions import CJ_criterion
+from DRL4AMM.rewards.RewardFunctions import CjCriterion
 from DRL4AMM.gym.probability_models import *
 
 # Add a linearly decreasing learning rate function
@@ -32,7 +32,7 @@ step_size = 1/n_steps
 timestamps = np.linspace(0, terminal_time, n_steps + 1)
 env_params = dict(terminal_time=terminal_time,
                   n_steps=n_steps,
-                  reward_function = CJ_criterion(phi=phi,alpha=alpha),
+                  reward_function = CjCriterion(phi=phi, alpha=alpha),
                   midprice_model = BrownianMotionMidpriceModel(volatility=sigma,
                                                                terminal_time=terminal_time,
                                                                step_size=step_size,

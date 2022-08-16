@@ -6,7 +6,7 @@ from gym.spaces import Box, MultiBinary
 from math import sqrt, isclose
 
 from DRL4AMM.gym.models import Action
-from DRL4AMM.rewards.RewardFunctions import RewardFunction, CJ_criterion
+from DRL4AMM.rewards.RewardFunctions import RewardFunction, CjCriterion
 
 
 class MMAtTouchEnvironment(gym.Env):
@@ -36,7 +36,7 @@ class MMAtTouchEnvironment(gym.Env):
         super(MMAtTouchEnvironment, self).__init__()
         self.terminal_time = terminal_time
         self.n_steps = n_steps
-        self.reward_function = reward_function or CJ_criterion(phi=0.01, alpha=10 * 0.01)
+        self.reward_function = reward_function or CjCriterion(phi=0.01, alpha=10 * 0.01)
         self.drift = drift
         self.volatility = volatility
         self.arrival_rate_ask = arrival_rate_ask

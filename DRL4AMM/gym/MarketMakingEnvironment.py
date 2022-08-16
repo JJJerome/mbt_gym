@@ -13,7 +13,7 @@ from DRL4AMM.gym.probability_models import (
     PoissonArrivalModel,
     ExponentialFillFunction,
 )
-from DRL4AMM.rewards.RewardFunctions import RewardFunction, CJ_criterion
+from DRL4AMM.rewards.RewardFunctions import RewardFunction, CjCriterion
 
 ACTION_SPACES = ["touch", "limit", "limit_and_market"]
 
@@ -43,7 +43,7 @@ class MarketMakingEnvironment(gym.Env):
         super(MarketMakingEnvironment, self).__init__()
         self.terminal_time = terminal_time
         self.n_steps = n_steps
-        self.reward_function = reward_function or CJ_criterion(phi=2 * 10 ** (-4), alpha=0.0001)
+        self.reward_function = reward_function or CjCriterion(phi=2 * 10 ** (-4), alpha=0.0001)
         self.midprice_model: MidpriceModel = midprice_model or BrownianMotionMidpriceModel()
         self.arrival_model: ArrivalModel = arrival_model or PoissonArrivalModel()
         self.fill_probability_model: FillProbabilityModel = fill_probability_model or ExponentialFillFunction()

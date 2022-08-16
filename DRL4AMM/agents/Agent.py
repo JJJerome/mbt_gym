@@ -7,7 +7,7 @@ from DRL4AMM.gym.models import Action
 
 class Agent(metaclass=abc.ABCMeta):
     @abc.abstractmethod
-    def get_action(self, state: np.ndarray) -> Action:
+    def get_action(self, state: np.ndarray) -> np.ndarray:
         pass
 
     def get_expected_action(self, state: np.ndarray, n_samples: int = 1000) -> np.ndarray:

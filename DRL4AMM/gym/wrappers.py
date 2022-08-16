@@ -10,20 +10,23 @@ class ReduceStateSizeWrapper(gym.Wrapper):
     :param env: (gym.Env) Gym environment that will be wrapped
     """
 
-    def __init__(self, env):
+    def __init__(self, env, list_of_state_indices: list = [1, 2]):
         # Call the parent constructor, so we can access self.env later
         super(ReduceStateSizeWrapper, self).__init__(env)
         assert type(env.observation_space) == gym.spaces.box.Box
         self.observation_space = gym.spaces.box.Box(
-            low=env.observation_space.low[2:], high=env.observation_space.high[2:], dtype=np.float64,
+            low=env.observation_space.low[list_of_state_indices],
+            high=env.observation_space.high[list_of_state_indices],
+            dtype=np.float64,
         )
+        self.list_of_state_indices = list_of_state_indices
 
     def reset(self):
         """
         Reset the environment
         """
         obs = self.env.reset()
-        return obs[2:]
+        return obs[self.list_of_state_indices]
 
     def step(self, action):
         """
@@ -31,7 +34,7 @@ class ReduceStateSizeWrapper(gym.Wrapper):
         :return: (np.ndarray, float, bool, dict) observation, reward, is the episode over?, additional informations
         """
         obs, reward, done, info = self.env.step(action)
-        return obs[2:], reward, done, info
+        return obs[self.list_of_state_indices], reward, done, info
 
 
 class NormaliseASObservation(gym.Wrapper):
@@ -46,7 +49,9 @@ class NormaliseASObservation(gym.Wrapper):
         self.normalisation_offset = (env.observation_space.high + env.observation_space.low) / 2
         assert type(env.observation_space) == gym.spaces.box.Box
         self.observation_space = gym.spaces.box.Box(
-            low=-np.ones(env.observation_space.shape), high=np.ones(env.observation_space.shape), dtype=np.float64,
+            low=-np.ones(env.observation_space.shape),
+            high=np.ones(env.observation_space.shape),
+            dtype=np.float64,
         )
 
     def reset(self):

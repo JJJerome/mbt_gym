@@ -52,7 +52,9 @@ class ModelBasedEnvironment(gym.Env):
         self.action_space = Box(low=0.0, high=np.inf, shape=(2,))  # agent chooses spread on bid and ask
         # observation space is (stock_price, cash, inventory, time)
         self.observation_space = Box(
-            low=np.zeros(4), high=np.array([np.inf, np.inf, self.max_inventory, terminal_time]), dtype=np.float64,
+            low=np.zeros(4),
+            high=np.array([np.inf, np.inf, self.max_inventory, terminal_time]),
+            dtype=np.float64,
         )
         self.obs: np.ndarray = self.observation_space.sample()
         self.trajectory: Iterator = iter([])

@@ -44,10 +44,15 @@ class MarketMakingEnvironment(gym.Env):
         self.terminal_time = terminal_time
         self.n_steps = n_steps
         self.reward_function = reward_function or CjCriterion(phi=2 * 10 ** (-4), alpha=0.0001)
-        self.midprice_model: MidpriceModel = midprice_model or BrownianMotionMidpriceModel()
-        self.arrival_model: ArrivalModel = arrival_model or PoissonArrivalModel()
-        self.fill_probability_model: FillProbabilityModel = fill_probability_model or ExponentialFillFunction()
-        assert action_type in ["limit", "limit_and_market", "touch"]
+        self.midprice_model: MidpriceModel = midprice_model or BrownianMotionMidpriceModel(
+            step_size=self.terminal_time / self.n_steps
+        )
+        self.arrival_model: ArrivalModel = arrival_model or PoissonArrivalModel(
+            step_size=self.terminal_time / self.n_steps
+        )
+        self.fill_probability_model: FillProbabilityModel = fill_probability_model or ExponentialFillFunction(
+            step_size=self.terminal_time / self.n_steps
+        )
         self.action_type = action_type
         self.initial_cash = initial_cash
         self.initial_inventory = initial_inventory
@@ -65,6 +70,7 @@ class MarketMakingEnvironment(gym.Env):
         self.time = 0.0
         self.book_half_spread = market_order_penalty
         self.half_spread = half_spread
+        self._check_params()
 
     def reset(self):
         self._reset_agent_state()
@@ -238,3 +244,11 @@ class MarketMakingEnvironment(gym.Env):
     @staticmethod
     def _clamp(probability):
         return max(min(probability, 1), 0)
+
+    def _check_params(self):
+        assert self.action_type in ["limit", "limit_and_market", "touch"]
+        for stochastic_process in [self.midprice_model, self.arrival_model, self.fill_probability_model]:
+            assert np.isclose(stochastic_process.step_size, self.terminal_time / self.n_steps, 2), (
+                f"{type(self.midprice_model).__name__}.step_size = {stochastic_process.step_size}, "
+                + f" but env.step_size = {self.terminal_time/self.n_steps}"
+            )

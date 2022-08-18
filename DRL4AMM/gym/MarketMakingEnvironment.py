@@ -13,6 +13,7 @@ from DRL4AMM.gym.probability_models import (
     PoissonArrivalModel,
     ExponentialFillFunction,
 )
+from DRL4AMM.gym.tracking.InfoCalculator import InfoCalculator, ActionInfoCalculator
 from DRL4AMM.rewards.RewardFunctions import RewardFunction, CjCriterion
 
 ACTION_SPACES = ["touch", "limit", "limit_and_market"]
@@ -37,7 +38,7 @@ class MarketMakingEnvironment(gym.Env):
         max_stock_price: float = None,
         max_depth: float = None,
         market_order_penalty: float = None,
-        half_spread: float = None,
+        info_calculator: InfoCalculator = None,
         seed: int = None,
     ):
         super(MarketMakingEnvironment, self).__init__()
@@ -69,7 +70,7 @@ class MarketMakingEnvironment(gym.Env):
         self.action_space = self._get_action_space()
         self.time = 0.0
         self.book_half_spread = market_order_penalty
-        self.half_spread = half_spread
+        self.info_calculator = info_calculator or ActionInfoCalculator()
         self._check_params()
 
     def reset(self):
@@ -84,7 +85,8 @@ class MarketMakingEnvironment(gym.Env):
         next_state = self._update_state(action)
         done = isclose(self.time, self.terminal_time)  # due to floating point arithmetic
         reward = self.reward_function.calculate(current_state, action, next_state, done)
-        return self.state, reward, done, {}
+        info = {} if self.info_calculator is None else self.info_calculator.calculate(next_state, action, reward)
+        return self.state, reward, done, info
 
     def render(self, mode="human"):
         pass

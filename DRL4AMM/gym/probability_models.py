@@ -143,7 +143,7 @@ class GeometricBrownianMotionMidpriceModel(MidpriceModel):
             max_value=self._get_max_value(initial_price, terminal_time),
             step_size=step_size,
             terminal_time=terminal_time,
-            initial_state=initial_price,
+            initial_state=np.array([initial_price]),
             seed=seed,
         )
 
@@ -153,8 +153,12 @@ class GeometricBrownianMotionMidpriceModel(MidpriceModel):
     def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> float:
         # Euler: current_midprice + self.drift * current_midprice * self.dt + self.volatility * current_midprice * sqrt(self.dt) * self.rng.normal()
         self.current_state = self.current_state * np.exp(
-            (self.drift - self.volatility**2 / 2) * self.step_size
-            + self.volatility * sqrt(self.step_size) * self.rng.normal()
+            np.array(
+                [
+                    (self.drift - self.volatility**2 / 2) * self.step_size
+                    + self.volatility * sqrt(self.step_size) * self.rng.normal()
+                ]
+            )
         )
 
     def _get_max_value(self, initial_price, terminal_time):
@@ -200,7 +204,7 @@ class PoissonArrivalModel(ArrivalModel):
     def __init__(
         self, intensity: np.ndarray = np.array([140.0, 140.0]), step_size: float = 0.01, seed: Optional[int] = None
     ):
-        self.intensity = intensity
+        self.intensity = np.array(intensity)
         super().__init__(
             min_value=np.array([]),
             max_value=np.array([]),

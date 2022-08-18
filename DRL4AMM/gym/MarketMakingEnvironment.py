@@ -2,6 +2,7 @@ from copy import copy
 import gym
 import numpy as np
 
+from gym.envs.registration import EnvSpec
 from gym.spaces import Box
 from math import isclose
 
@@ -90,6 +91,10 @@ class MarketMakingEnvironment(gym.Env):
 
     def render(self, mode="human"):
         pass
+
+    @property
+    def spec(self):
+        return EnvSpec(max_episode_steps=self.n_steps)
 
     def _get_max_cash(self) -> float:
         return self.max_inventory * self.max_stock_price

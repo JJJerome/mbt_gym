@@ -94,7 +94,7 @@ class MarketMakingEnvironment(gym.Env):
 
     @property
     def spec(self):
-        return EnvSpec(max_episode_steps=self.n_steps)
+        return EnvSpec(id="MarketMakingEnv-v0", max_episode_steps=self.n_steps)
 
     def _get_max_cash(self) -> float:
         return self.max_inventory * self.max_stock_price

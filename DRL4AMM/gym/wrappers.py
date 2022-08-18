@@ -36,6 +36,10 @@ class ReduceStateSizeWrapper(gym.Wrapper):
         obs, reward, done, info = self.env.step(action)
         return obs[self.list_of_state_indices], reward, done, info
 
+    @property
+    def spec(self):
+        return self.env.spec
+
 
 class NormaliseASObservation(gym.Wrapper):
     """

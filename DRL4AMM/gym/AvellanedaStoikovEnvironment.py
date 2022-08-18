@@ -6,7 +6,7 @@ from gym.spaces import Box
 from math import sqrt, isclose
 
 from DRL4AMM.gym.models import Action
-from DRL4AMM.rewards.RewardFunctions import RewardFunction, CJ_criterion
+from DRL4AMM.rewards.RewardFunctions import RewardFunction, CjCriterion
 
 
 class AvellanedaStoikovEnvironment(gym.Env):
@@ -34,7 +34,7 @@ class AvellanedaStoikovEnvironment(gym.Env):
         super(AvellanedaStoikovEnvironment, self).__init__()
         self.terminal_time = terminal_time
         self.n_steps = n_steps
-        self.reward_function = reward_function or CJ_criterion(phi=2 * 10 ** (-4), alpha=0.0001)
+        self.reward_function = reward_function or CjCriterion(phi=2 * 10 ** (-4), alpha=0.0001)
         self.drift = drift
         self.volatility = volatility
         self.arrival_rate = arrival_rate
@@ -82,7 +82,6 @@ class AvellanedaStoikovEnvironment(gym.Env):
         next_state = deepcopy(self.state)
         next_state[0] += self.drift * self.dt + self.volatility * sqrt(self.dt) * self.rng.normal()
         next_state[3] += self.dt
-        next_state[3] = np.round(next_state[3], decimals=3)  # due to floating point arithmetic in self.dt
         fill_prob_bid, fill_prob_ask = self.fill_prob(action.bid), self.fill_prob(action.ask)
         unif_bid, unif_ask = self.rng.random(2)
         if unif_bid > fill_prob_bid and unif_ask > fill_prob_ask:  # neither the agent's bid nor their ask is filled

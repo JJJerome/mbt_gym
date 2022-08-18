@@ -15,9 +15,9 @@ sys.path.append("../")
 from DRL4AMM.gym.MMAtTouchEnvironment import MMAtTouchEnvironment
 from DRL4AMM.gym.wrappers import *
 from DRL4AMM.gym.helpers.plotting import *
-from DRL4AMM.rewards.RewardFunctions import CJ_criterion
+from DRL4AMM.rewards.RewardFunctions import CjCriterion
 
-reward_function = CJ_criterion(phi=0.01, alpha=10 * 0.01)
+reward_function = CjCriterion(phi=0.01, alpha=10 * 0.01)
 env_params = {"reward_function": reward_function, "max_inventory_exceeded_penalty": 0.1}
 env = MMAtTouchEnvironment(**env_params)
 

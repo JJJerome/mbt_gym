@@ -2,6 +2,7 @@ from copy import copy
 import gym
 import numpy as np
 
+from gym.envs.registration import EnvSpec
 from gym.spaces import Box
 from math import isclose
 
@@ -13,7 +14,8 @@ from DRL4AMM.gym.probability_models import (
     PoissonArrivalModel,
     ExponentialFillFunction,
 )
-from DRL4AMM.rewards.RewardFunctions import RewardFunction, CJ_criterion
+from DRL4AMM.gym.tracking.InfoCalculator import InfoCalculator, ActionInfoCalculator
+from DRL4AMM.rewards.RewardFunctions import RewardFunction, CjCriterion
 
 ACTION_SPACES = ["touch", "limit", "limit_and_market"]
 
@@ -37,17 +39,22 @@ class MarketMakingEnvironment(gym.Env):
         max_stock_price: float = None,
         max_depth: float = None,
         market_order_penalty: float = None,
-        half_spread: float = None,
+        info_calculator: InfoCalculator = None,
         seed: int = None,
     ):
         super(MarketMakingEnvironment, self).__init__()
         self.terminal_time = terminal_time
         self.n_steps = n_steps
-        self.reward_function = reward_function or CJ_criterion(phi=2 * 10 ** (-4), alpha=0.0001)
-        self.midprice_model: MidpriceModel = midprice_model or BrownianMotionMidpriceModel()
-        self.arrival_model: ArrivalModel = arrival_model or PoissonArrivalModel()
-        self.fill_probability_model: FillProbabilityModel = fill_probability_model or ExponentialFillFunction()
-        assert action_type in ["limit", "limit_and_market", "touch"]
+        self.reward_function = reward_function or CjCriterion(phi=2 * 10 ** (-4), alpha=0.0001)
+        self.midprice_model: MidpriceModel = midprice_model or BrownianMotionMidpriceModel(
+            step_size=self.terminal_time / self.n_steps
+        )
+        self.arrival_model: ArrivalModel = arrival_model or PoissonArrivalModel(
+            step_size=self.terminal_time / self.n_steps
+        )
+        self.fill_probability_model: FillProbabilityModel = fill_probability_model or ExponentialFillFunction(
+            step_size=self.terminal_time / self.n_steps
+        )
         self.action_type = action_type
         self.initial_cash = initial_cash
         self.initial_inventory = initial_inventory
@@ -64,7 +71,8 @@ class MarketMakingEnvironment(gym.Env):
         self.action_space = self._get_action_space()
         self.time = 0.0
         self.book_half_spread = market_order_penalty
-        self.half_spread = half_spread
+        self.info_calculator = info_calculator or ActionInfoCalculator()
+        self._check_params()
 
     def reset(self):
         self._reset_agent_state()
@@ -78,10 +86,16 @@ class MarketMakingEnvironment(gym.Env):
         next_state = self._update_state(action)
         done = isclose(self.time, self.terminal_time)  # due to floating point arithmetic
         reward = self.reward_function.calculate(current_state, action, next_state, done)
-        return self.state, reward, done, {}
+        info = {} if self.info_calculator is None else self.info_calculator.calculate(next_state, action, reward)
+        return self.state, reward, done, info
 
     def render(self, mode="human"):
         pass
+
+    # TODO: add the spec attribute externally by registering the env with a max_episode_steps
+    # @property
+    # def spec(self):
+    #     return EnvSpec(id="MarketMakingEnv-v0", max_episode_steps=self.n_steps)
 
     def _get_max_cash(self) -> float:
         return self.max_inventory * self.max_stock_price
@@ -113,7 +127,6 @@ class MarketMakingEnvironment(gym.Env):
             self.inventory += mo_buy - mo_sell
         self.inventory += np.sum(arrivals * fills * -fill_multiplier)
         if self.action_type == "touch":
-            posted = np.array([self.post_buy_at_touch(action), self.post_sell_at_touch(action)])
             self.cash += np.sum(
                 fill_multiplier * arrivals * fills * (self.midprice + self.book_half_spread * fill_multiplier)
             )
@@ -238,3 +251,11 @@ class MarketMakingEnvironment(gym.Env):
     @staticmethod
     def _clamp(probability):
         return max(min(probability, 1), 0)
+
+    def _check_params(self):
+        assert self.action_type in ["limit", "limit_and_market", "touch"]
+        for stochastic_process in [self.midprice_model, self.arrival_model, self.fill_probability_model]:
+            assert np.isclose(stochastic_process.step_size, self.terminal_time / self.n_steps, 2), (
+                f"{type(self.midprice_model).__name__}.step_size = {stochastic_process.step_size}, "
+                + f" but env.step_size = {self.terminal_time/self.n_steps}"
+            )

@@ -92,9 +92,10 @@ class MarketMakingEnvironment(gym.Env):
     def render(self, mode="human"):
         pass
 
-    @property
-    def spec(self):
-        return EnvSpec(id="MarketMakingEnv-v0", max_episode_steps=self.n_steps)
+    # TODO: add the spec attribute externally by registering the env with a max_episode_steps
+    # @property
+    # def spec(self):
+    #     return EnvSpec(id="MarketMakingEnv-v0", max_episode_steps=self.n_steps)
 
     def _get_max_cash(self) -> float:
         return self.max_inventory * self.max_stock_price
@@ -126,7 +127,6 @@ class MarketMakingEnvironment(gym.Env):
             self.inventory += mo_buy - mo_sell
         self.inventory += np.sum(arrivals * fills * -fill_multiplier)
         if self.action_type == "touch":
-            posted = np.array([self.post_buy_at_touch(action), self.post_sell_at_touch(action)])
             self.cash += np.sum(
                 fill_multiplier * arrivals * fills * (self.midprice + self.book_half_spread * fill_multiplier)
             )

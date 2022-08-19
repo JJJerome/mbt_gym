@@ -16,13 +16,16 @@ class StochasticProcessModel(metaclass=abc.ABCMeta):
         step_size: float,
         terminal_time: float,
         initial_state: np.ndarray,
+        num_trajectories: int = 1,
         seed: int = None,
     ):
         self.min_value = min_value
         self.max_value = max_value
         self.step_size = step_size
         self.terminal_time = terminal_time
+        self.num_trajectories = num_trajectories
         self.initial_state = initial_state
+        self.initial_vector_state = self._get_initial_vector_state()
         self.current_state = initial_state
         self.rng = default_rng(seed)
 
@@ -34,6 +37,15 @@ class StochasticProcessModel(metaclass=abc.ABCMeta):
     def update(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
         pass
 
+    def _get_initial_vector_state(self) -> np.ndarray:
+        initial_state = self.initial_state
+        if isinstance(initial_state, list):
+            initial_state = np.array([self.initial_state])
+        assert (
+            len(initial_state.shape) == 2 and initial_state.shape[0] == 1
+        ), "Initial state must be a vector of shape (1, state_size)."
+        return np.repeat(initial_state, self.num_trajectories, axis=0)
+
 
 MidpriceModel = StochasticProcessModel
 
@@ -41,14 +53,15 @@ MidpriceModel = StochasticProcessModel
 class FillProbabilityModel(StochasticProcessModel):
     def __init__(
         self,
-        min_value: float,
-        max_value: float,
+        min_value: np.ndarray,
+        max_value: np.ndarray,
         step_size: float,
         terminal_time: float,
-        initial_state: float,
+        initial_state: np.ndarray,
+        num_trajectories: int = 1,
         seed: int = None,
     ):
-        super().__init__(min_value, max_value, step_size, terminal_time, initial_state, seed)
+        super().__init__(min_value, max_value, step_size, terminal_time, initial_state, num_trajectories, seed)
 
     @abc.abstractmethod
     def get_fill_probabilities(self, depths: np.ndarray) -> np.ndarray:
@@ -73,14 +86,15 @@ class ArrivalModel(StochasticProcessModel):
 
     def __init__(
         self,
-        min_value: float,
-        max_value: float,
+        min_value: np.ndarray,
+        max_value: np.ndarray,
         step_size: float,
         terminal_time: float,
-        initial_state: float,
+        initial_state: np.ndarray,
+        num_trajectories: int = 1,
         seed: int = None,
     ):
-        super().__init__(min_value, max_value, step_size, terminal_time, initial_state, seed)
+        super().__init__(min_value, max_value, step_size, terminal_time, initial_state, num_trajectories, seed)
 
     @abc.abstractmethod
     def get_arrivals(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray) -> np.ndarray:
@@ -100,6 +114,7 @@ class BrownianMotionMidpriceModel(MidpriceModel):
         initial_price: float = 100,
         terminal_time: float = 1.0,
         step_size: float = 0.01,
+        num_trajectories: int = 1,
         seed: Optional[int] = None,
     ):
         self.drift = drift
@@ -111,15 +126,19 @@ class BrownianMotionMidpriceModel(MidpriceModel):
             step_size=step_size,
             terminal_time=terminal_time,
             initial_state=np.array([initial_price]),
+            num_trajectories=num_trajectories,
             seed=seed,
         )
 
     def reset(self):
-        self.current_state = self.initial_state
+        self.current_state = self.initial_vector_state
 
-    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> float:
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> np.ndarray:
         self.current_state = self.current_state + np.array(
-            [self.drift * self.step_size + self.volatility * sqrt(self.step_size) * self.rng.normal()]
+            [
+                self.drift * self.step_size
+                + self.volatility * sqrt(self.step_size) * self.rng.normal(self.num_trajectories)
+            ]
         )
 
     def _get_max_value(self, initial_price, terminal_time):
@@ -127,6 +146,7 @@ class BrownianMotionMidpriceModel(MidpriceModel):
 
 
 class GeometricBrownianMotionMidpriceModel(MidpriceModel):
+    # TODO: update to mirror the abstract class
     def __init__(
         self,
         drift: float = 0.0,
@@ -148,7 +168,7 @@ class GeometricBrownianMotionMidpriceModel(MidpriceModel):
         )
 
     def reset(self):
-        self.current_state = self.initial_state
+        self.current_state = self.initial_vector_state
 
     def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> float:
         # Euler: current_midprice + self.drift * current_midprice * self.dt + self.volatility * current_midprice * sqrt(self.dt) * self.rng.normal()
@@ -226,6 +246,7 @@ class PoissonArrivalModel(ArrivalModel):
 
 
 class HawkesArrivalModel(ArrivalModel):
+    # TODO: update to mirror the abstract class
     def __init__(
         self,
         baseline_arrival_rate: np.ndarray = np.array([100.0, 100.0]),

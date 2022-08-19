@@ -204,9 +204,9 @@ class MarketMakingEnvironment(gym.Env):
 
     def _get_initial_state(self) -> np.ndarray:
         state = np.array([self.initial_cash, self.initial_inventory, 0])
-        state = np.append(state, self.midprice_model.initial_state)
-        state = np.append(state, self.arrival_model.initial_state)
-        state = np.append(state, self.fill_probability_model.initial_state)
+        state = np.append(state, self.midprice_model.initial_vector_state)
+        state = np.append(state, self.arrival_model.initial_vector_state)
+        state = np.append(state, self.fill_probability_model.initial_vector_state)
         return state
 
     def _get_observation_space(self) -> gym.spaces.Space:

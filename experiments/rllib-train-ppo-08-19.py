@@ -21,7 +21,7 @@ os.environ["PYTHONPATH"] = "/LOCAL2/jjerome/GitHub/DRL4AMM/"
 
 from DRL4AMM.gym.MarketMakingEnvironment import MarketMakingEnvironment
 from DRL4AMM.gym.wrappers import ReduceStateSizeWrapper
-from DRL4AMM.rewards.RewardFunctions import CjCriterion, PnL
+from DRL4AMM.rewards.RewardFunctions import PnL
 from DRL4AMM.gym.probability_models import *
 
 import multiprocessing

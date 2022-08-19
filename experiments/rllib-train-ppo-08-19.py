@@ -11,7 +11,13 @@ from ray.rllib.policy import Policy
 from ray.rllib.evaluation import MultiAgentEpisode, RolloutWorker
 from ray.rllib.algorithms.callbacks import DefaultCallbacks
 
-from gym.envs.registration import register
+# Add DRL4AMM to path so that we can import it
+import sys
+sys.path.append("/LOCAL2/jjerome/GitHub/DRL4AMM/")
+
+# Set the PYTHONPATH so that the workers are all aware of DRL4AMM
+import os
+os.environ["PYTHONPATH"] = "/LOCAL2/jjerome/GitHub/DRL4AMM/"
 
 from DRL4AMM.gym.MarketMakingEnvironment import MarketMakingEnvironment
 from DRL4AMM.gym.wrappers import ReduceStateSizeWrapper
@@ -23,6 +29,7 @@ num_cpus = multiprocessing.cpu_count()
 num_gpus = torch.cuda.device_count()
 
 num_workers = 10
+print("Initialising Ray")
 info = ray.init(ignore_reinit_error=True,num_cpus=num_cpus,num_gpus = num_gpus, include_dashboard=True)
 print("Dashboard URL: http://{}".format(info.address_info["webui_url"]))
 
@@ -92,6 +99,8 @@ class MyCallbacks(DefaultCallbacks):
         episode.custom_metrics["actions"].append(episode.last_action_for())
 
 config["callbacks"] = MyCallbacks
+
+print("Traing PPO agent.\n")
 
 # Resume from checkpoint
 analysis = tune.run(

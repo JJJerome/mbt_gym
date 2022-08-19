@@ -15,7 +15,7 @@ from DRL4AMM.gym.probability_models import (
     ExponentialFillFunction,
 )
 from DRL4AMM.gym.tracking.InfoCalculator import InfoCalculator, ActionInfoCalculator
-from DRL4AMM.rewards.RewardFunctions import RewardFunction, CjCriterion
+from DRL4AMM.rewards.RewardFunctions import RewardFunction, CjCriterion, PnL
 
 ACTION_SPACES = ["touch", "limit", "limit_and_market"]
 
@@ -45,7 +45,7 @@ class MarketMakingEnvironment(gym.Env):
         super(MarketMakingEnvironment, self).__init__()
         self.terminal_time = terminal_time
         self.n_steps = n_steps
-        self.reward_function = reward_function or CjCriterion(phi=2 * 10 ** (-4), alpha=0.0001)
+        self.reward_function = reward_function or PnL()  # CjCriterion(phi=2 * 10 ** (-4), alpha=0.0001)
         self.midprice_model: MidpriceModel = midprice_model or BrownianMotionMidpriceModel(
             step_size=self.terminal_time / self.n_steps
         )
@@ -61,9 +61,9 @@ class MarketMakingEnvironment(gym.Env):
         self.max_inventory = max_inventory
         self.cash = initial_cash
         self.inventory = initial_inventory
-        self.max_stock_price = max_stock_price or self.midprice_model.max_value[0,0]
+        self.max_stock_price = max_stock_price or self.midprice_model.max_value[0, 0]
         self.max_cash = max_cash or self._get_max_cash()
-        self.max_depth = max_depth or self._get_max_depth()
+        self.max_depth = max_depth or self.fill_probability_model.max_depth
         self.rng = np.random.default_rng(seed)
         self.dt = self.terminal_time / self.n_steps
         self.initial_state = self._get_initial_state()
@@ -143,7 +143,7 @@ class MarketMakingEnvironment(gym.Env):
         state = np.append(state, self.midprice_model.current_state)
         state = np.append(state, self.arrival_model.current_state)
         state = np.append(state, self.fill_probability_model.current_state)
-        return state
+        return state.reshape(1, -1)
 
     @property
     def midprice(self):
@@ -163,13 +163,13 @@ class MarketMakingEnvironment(gym.Env):
 
     def limit_buy_depth(self, action: np.ndarray):
         if self.action_type in ["limit", "limit_and_market"]:
-            return action[0,0]
+            return action[0, 0]
         else:
             raise Exception('Bid depth only exists for action_type in ["limit", "limit_and_market"].')
 
     def limit_sell_depth(self, action: np.ndarray):
         if self.action_type in ["limit", "limit_and_market"]:
-            return action[0,1]
+            return action[0, 1]
         else:
             raise Exception('Ask depth only exists for action_type in ["limit", "limit_and_market"].')
 

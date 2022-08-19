@@ -1,4 +1,5 @@
 import abc
+from copy import copy
 from math import sqrt
 from typing import Optional
 
@@ -27,12 +28,11 @@ class StochasticProcessModel(metaclass=abc.ABCMeta):
         self.initial_state = initial_state
         self.initial_vector_state = self._get_initial_vector_state()
         self._check_attribute_shapes()
-        self.current_state = initial_state
+        self.current_state = copy(self.initial_vector_state)
         self.rng = default_rng(seed)
 
-    @abc.abstractmethod
     def reset(self):
-        pass
+        self.current_state = self.initial_vector_state
 
     @abc.abstractmethod
     def update(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
@@ -140,9 +140,6 @@ class BrownianMotionMidpriceModel(MidpriceModel):
             seed=seed,
         )
 
-    def reset(self):
-        self.current_state = self.initial_vector_state
-
     def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> np.ndarray:
         self.current_state = (
             self.current_state
@@ -175,9 +172,6 @@ class GeometricBrownianMotionMidpriceModel(MidpriceModel):
             initial_state=np.array([initial_price]),
             seed=seed,
         )
-
-    def reset(self):
-        self.current_state = self.initial_vector_state
 
     def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> float:
         # Euler: current_midprice + self.drift * current_midprice * self.dt + self.volatility * current_midprice * sqrt(self.dt) * self.rng.normal()
@@ -217,9 +211,6 @@ class ExponentialFillFunction(FillProbabilityModel):
     def max_depth(self) -> float:
         return -np.log(0.01) / self.fill_exponent
 
-    def reset(self):
-        pass
-
     def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray):
         pass
 
@@ -244,9 +235,6 @@ class PoissonArrivalModel(ArrivalModel):
         )
 
     def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray):
-        pass
-
-    def reset(self):
         pass
 
     def get_arrivals(self) -> np.ndarray:
@@ -276,9 +264,6 @@ class HawkesArrivalModel(ArrivalModel):
             initial_state=baseline_arrival_rate,
             seed=seed,
         )
-
-    def reset(self):
-        self.current_state = self.baseline_arrival_rate
 
     def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> np.ndarray:
         self.current_state = (

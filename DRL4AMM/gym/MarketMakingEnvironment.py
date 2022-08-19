@@ -61,7 +61,7 @@ class MarketMakingEnvironment(gym.Env):
         self.max_inventory = max_inventory
         self.cash = initial_cash
         self.inventory = initial_inventory
-        self.max_stock_price = max_stock_price or self.midprice_model.max_value
+        self.max_stock_price = max_stock_price or self.midprice_model.max_value[0,0]
         self.max_cash = max_cash or self._get_max_cash()
         self.max_depth = max_depth or self._get_max_depth()
         self.rng = np.random.default_rng(seed)
@@ -106,7 +106,7 @@ class MarketMakingEnvironment(gym.Env):
     def _update_state(self, action: np.ndarray) -> np.ndarray:
         arrivals = self.arrival_model.get_arrivals()
         if self.action_type in ["limit", "limit_and_market"]:
-            depths = np.array([self.limit_buy_depth(action), self.limit_sell_depth(action)])
+            depths = np.array([[self.limit_buy_depth(action), self.limit_sell_depth(action)]])
             fills = self.fill_probability_model.get_hypothetical_fills(depths)
         else:
             fills = np.array([self.post_buy_at_touch(action), self.post_sell_at_touch(action)])
@@ -163,13 +163,13 @@ class MarketMakingEnvironment(gym.Env):
 
     def limit_buy_depth(self, action: np.ndarray):
         if self.action_type in ["limit", "limit_and_market"]:
-            return action[0]
+            return action[0,0]
         else:
             raise Exception('Bid depth only exists for action_type in ["limit", "limit_and_market"].')
 
     def limit_sell_depth(self, action: np.ndarray):
         if self.action_type in ["limit", "limit_and_market"]:
-            return action[1]
+            return action[0,1]
         else:
             raise Exception('Ask depth only exists for action_type in ["limit", "limit_and_market"].')
 

@@ -26,6 +26,7 @@ class StochasticProcessModel(metaclass=abc.ABCMeta):
         self.num_trajectories = num_trajectories
         self.initial_state = initial_state
         self.initial_vector_state = self._get_initial_vector_state()
+        self._check_attribute_shapes()
         self.current_state = initial_state
         self.rng = default_rng(seed)
 
@@ -37,13 +38,17 @@ class StochasticProcessModel(metaclass=abc.ABCMeta):
     def update(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
         pass
 
+    def _check_attribute_shapes(self):
+        for name in ["initial_state", "min_value", "max_value"]:
+            attribute = getattr(self, name)
+            assert (
+                len(attribute.shape) == 2 and attribute.shape[0] == 1
+            ), f"Attribute {name} must be a vector of shape (1, state_size)."
+
     def _get_initial_vector_state(self) -> np.ndarray:
         initial_state = self.initial_state
         if isinstance(initial_state, list):
-            initial_state = np.array([self.initial_state])
-        assert (
-            len(initial_state.shape) == 2 and initial_state.shape[0] == 1
-        ), "Initial state must be a vector of shape (1, state_size)."
+            initial_state = np.array([[self.initial_state]])
         return np.repeat(initial_state, self.num_trajectories, axis=0)
 
 
@@ -64,13 +69,18 @@ class FillProbabilityModel(StochasticProcessModel):
         super().__init__(min_value, max_value, step_size, terminal_time, initial_state, num_trajectories, seed)
 
     @abc.abstractmethod
-    def get_fill_probabilities(self, depths: np.ndarray) -> np.ndarray:
+    def _get_fill_probabilities(self, depths: np.ndarray) -> np.ndarray:
+        """Note that _get_fill_probabilities can return a 'probability' greater than one. However, this is not an issue
+        for it is only use is in `get_hypothetical_fills` below."""
         pass
 
-    @abc.abstractmethod
     def get_hypothetical_fills(self, depths: np.ndarray) -> np.ndarray:
-        unif = self.rng.uniform(size=2)
-        return unif < self.get_fill_probabilities(depths)
+        assert depths.shape == (self.num_trajectories, 2), (
+            "Depths must be a numpy array of shape "
+            + f"({self.num_trajectories},2). Instead it is a numpy array of shape {depths.shape}."
+        )
+        unif = self.rng.uniform(size=(self.num_trajectories, 2))
+        return unif < self._get_fill_probabilities(depths)
 
     @property
     @abc.abstractmethod
@@ -97,7 +107,7 @@ class ArrivalModel(StochasticProcessModel):
         super().__init__(min_value, max_value, step_size, terminal_time, initial_state, num_trajectories, seed)
 
     @abc.abstractmethod
-    def get_arrivals(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray) -> np.ndarray:
+    def get_arrivals(self) -> np.ndarray:
         pass
 
 
@@ -121,11 +131,11 @@ class BrownianMotionMidpriceModel(MidpriceModel):
         self.volatility = volatility
         self.terminal_time = terminal_time
         super().__init__(
-            min_value=initial_price - (self._get_max_value(initial_price, terminal_time) - initial_price),
-            max_value=self._get_max_value(initial_price, terminal_time),
+            min_value=np.array([[initial_price - (self._get_max_value(initial_price, terminal_time) - initial_price)]]),
+            max_value=np.array([[self._get_max_value(initial_price, terminal_time)]]),
             step_size=step_size,
             terminal_time=terminal_time,
-            initial_state=np.array([initial_price]),
+            initial_state=np.array([[initial_price]]),
             num_trajectories=num_trajectories,
             seed=seed,
         )
@@ -134,11 +144,10 @@ class BrownianMotionMidpriceModel(MidpriceModel):
         self.current_state = self.initial_vector_state
 
     def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> np.ndarray:
-        self.current_state = self.current_state + np.array(
-            [
-                self.drift * self.step_size
-                + self.volatility * sqrt(self.step_size) * self.rng.normal(self.num_trajectories)
-            ]
+        self.current_state = (
+            self.current_state
+            + self.drift * self.step_size * np.ones((self.num_trajectories, 1))
+            + self.volatility * sqrt(self.step_size) * self.rng.normal(size=(self.num_trajectories, 1))
         )
 
     def _get_max_value(self, initial_price, terminal_time):
@@ -173,12 +182,8 @@ class GeometricBrownianMotionMidpriceModel(MidpriceModel):
     def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> float:
         # Euler: current_midprice + self.drift * current_midprice * self.dt + self.volatility * current_midprice * sqrt(self.dt) * self.rng.normal()
         self.current_state = self.current_state * np.exp(
-            np.array(
-                [
-                    (self.drift - self.volatility**2 / 2) * self.step_size
-                    + self.volatility * sqrt(self.step_size) * self.rng.normal()
-                ]
-            )
+            (self.drift - self.volatility**2 / 2) * self.step_size * np.ones((self.num_trajectories, 1))
+            + self.volatility * sqrt(self.step_size) * self.rng.normal(size=(self.num_trajectories, 1))
         )
 
     def _get_max_value(self, initial_price, terminal_time):
@@ -191,23 +196,22 @@ class GeometricBrownianMotionMidpriceModel(MidpriceModel):
 
 
 class ExponentialFillFunction(FillProbabilityModel):
-    def __init__(self, fill_exponent: float = 1.5, step_size: float = 0.1, seed: Optional[int] = None):
+    def __init__(
+        self, fill_exponent: float = 1.5, step_size: float = 0.1, num_trajectories: int = 1, seed: Optional[int] = None
+    ):
         self.fill_exponent = fill_exponent
         super().__init__(
-            min_value=np.array([]),
-            max_value=np.array([]),
+            min_value=np.array([[]]),
+            max_value=np.array([[]]),
             step_size=step_size,
-            terminal_time=np.array([]),
-            initial_state=np.array([]),
+            terminal_time=0.0,
+            initial_state=np.array([[]]),
+            num_trajectories=num_trajectories,
             seed=seed,
         )
 
-    def get_fill_probabilities(self, depths: np.ndarray) -> np.ndarray:
+    def _get_fill_probabilities(self, depths: np.ndarray) -> np.ndarray:
         return np.exp(-self.fill_exponent * depths)
-
-    def get_hypothetical_fills(self, depths: np.ndarray) -> np.ndarray:
-        unif = self.rng.uniform(size=2)
-        return unif < self.get_fill_probabilities(depths)
 
     @property
     def max_depth(self) -> float:
@@ -222,15 +226,20 @@ class ExponentialFillFunction(FillProbabilityModel):
 
 class PoissonArrivalModel(ArrivalModel):
     def __init__(
-        self, intensity: np.ndarray = np.array([140.0, 140.0]), step_size: float = 0.01, seed: Optional[int] = None
+        self,
+        intensity: np.ndarray = np.array([140.0, 140.0]),
+        step_size: float = 0.001,
+        num_trajectories: int = 1,
+        seed: Optional[int] = None,
     ):
         self.intensity = np.array(intensity)
         super().__init__(
-            min_value=np.array([]),
-            max_value=np.array([]),
+            min_value=np.array([[]]),
+            max_value=np.array([[]]),
             step_size=step_size,
-            terminal_time=np.array([]),
-            initial_state=np.array([]),
+            terminal_time=0.0,
+            initial_state=np.array([[]]),
+            num_trajectories=num_trajectories,
             seed=seed,
         )
 
@@ -241,7 +250,7 @@ class PoissonArrivalModel(ArrivalModel):
         pass
 
     def get_arrivals(self) -> np.ndarray:
-        unif = self.rng.uniform(size=2)
+        unif = self.rng.uniform(size=(self.num_trajectories, 2))
         return unif < self.intensity * self.step_size
 
 

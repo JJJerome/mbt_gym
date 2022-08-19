@@ -75,7 +75,7 @@ class VectorizedMarketMakingEnvironment(VecEnv):
         self.arrival_model.reset()
         self.fill_probability_model.reset()
         self.state = self._get_initial_state()
-        return copy(self.state)[:, 1:3]
+        return copy(self.state)[:, 1:3]  # TODO: sort this by using a wrapper
 
     def step_async(self, actions: np.ndarray) -> None:
         self.actions = actions
@@ -84,9 +84,10 @@ class VectorizedMarketMakingEnvironment(VecEnv):
         current_state = copy(self.state)
         next_state = self._update_state(self.actions)
         done = self.state[0, 2] >= self.terminal_time - self.dt / 2
+        dones = np.full((self.num_trajectories,), done, dtype=bool)
         rewards = self.reward_function.calculate(current_state, self.actions, next_state, done)
         infos = self.empty_infos
-        return copy(self.state)[:, 1:3], rewards, done, infos
+        return copy(self.state)[:, 1:3], rewards, dones, infos  # TODO: sort this by using a wrapper
 
     def close(self) -> None:
         pass
@@ -190,10 +191,15 @@ class VectorizedMarketMakingEnvironment(VecEnv):
     # observation space is (cash, inventory, time, stock price)
     def _get_observation_space(self):
         return Box(
-            low=np.array([-self.max_cash, -self.max_inventory, 0, 0]),
-            high=np.array([self.max_cash, self.max_inventory, self.terminal_time, self.max_stock_price]),
+            low=np.array([-self.max_inventory, 0]),
+            high=np.array([self.max_inventory, self.terminal_time]),
             dtype=np.float64,
         )
+        # return Box(
+        #     low=np.array([-self.max_cash, -self.max_inventory, 0, 0]),
+        #     high=np.array([self.max_cash, self.max_inventory, self.terminal_time, self.max_stock_price]),
+        #     dtype=np.float64,
+        # )  # TODO: sort this by using a wrapper
 
     def _get_action_space(self):
         return Box(low=0.0, high=self.max_depth, shape=(2,))  # agent chooses spread on bid and ask

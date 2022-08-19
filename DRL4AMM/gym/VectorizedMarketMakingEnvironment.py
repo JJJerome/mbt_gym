@@ -190,13 +190,13 @@ class VectorizedMarketMakingEnvironment(VecEnv):
     # observation space is (cash, inventory, time, stock price)
     def _get_observation_space(self):
         return Box(
-            low=np.array([[-self.max_cash, -self.max_inventory, 0, 0]]),
-            high=np.array([[self.max_cash, self.max_inventory, self.terminal_time, self.max_stock_price]]),
+            low=np.array([-self.max_cash, -self.max_inventory, 0, 0]),
+            high=np.array([self.max_cash, self.max_inventory, self.terminal_time, self.max_stock_price]),
             dtype=np.float64,
         )
 
     def _get_action_space(self):
-        return Box(low=0.0, high=self.max_depth, shape=(1, 2))  # agent chooses spread on bid and ask
+        return Box(low=0.0, high=self.max_depth, shape=(2,))  # agent chooses spread on bid and ask
 
 
 # import torch

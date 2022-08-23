@@ -152,7 +152,6 @@ class BrownianMotionMidpriceModel(MidpriceModel):
 
 
 class GeometricBrownianMotionMidpriceModel(MidpriceModel):
-    # TODO: update to mirror the abstract class
     def __init__(
         self,
         drift: float = 0.0,
@@ -160,21 +159,23 @@ class GeometricBrownianMotionMidpriceModel(MidpriceModel):
         initial_price: float = 100,
         terminal_time: float = 1.0,
         step_size: float = 0.01,
+        num_trajectories: int = 1,
         seed: Optional[int] = None,
     ):
         self.drift = drift
         self.volatility = volatility
+        self.terminal_time = terminal_time
         super().__init__(
-            min_value=initial_price - (self._get_max_value(initial_price, terminal_time) - initial_price),
-            max_value=self._get_max_value(initial_price, terminal_time),
+            min_value = np.array([[initial_price - (self._get_max_value(initial_price, terminal_time) - initial_price)]]),
+            max_value=np.array([[self._get_max_value(initial_price, terminal_time)]]),
             step_size=step_size,
             terminal_time=terminal_time,
-            initial_state=np.array([initial_price]),
+            initial_state=np.array([[initial_price]]),
+            num_trajectories=num_trajectories,
             seed=seed,
         )
 
-    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> float:
-        # Euler: current_midprice + self.drift * current_midprice * self.dt + self.volatility * current_midprice * sqrt(self.dt) * self.rng.normal()
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> np.ndarray:
         self.current_state = self.current_state * np.exp(
             (self.drift - self.volatility**2 / 2) * self.step_size * np.ones((self.num_trajectories, 1))
             + self.volatility * sqrt(self.step_size) * self.rng.normal(size=(self.num_trajectories, 1))

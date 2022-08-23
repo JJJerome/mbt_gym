@@ -244,41 +244,42 @@ class PoissonArrivalModel(ArrivalModel):
 
 
 class HawkesArrivalModel(ArrivalModel):
-    # TODO: update to mirror the abstract class
     def __init__(
         self,
-        baseline_arrival_rate: np.ndarray = np.array([100.0, 100.0]),
+        baseline_arrival_rate: np.ndarray = np.array([[10.0, 10.0]]),
         step_size: float = 0.01,
-        alpha: float = 2,
-        beta: float = 0.5,
+        jump_size: float = 40.0,
+        mean_reversion_speed: float = 60.0,
         terminal_time: float = 1,
+        num_trajectories: int = 1,
         seed: Optional[int] = None,
     ):
         self.baseline_arrival_rate = baseline_arrival_rate
-        self.alpha = alpha  # see https://arxiv.org/pdf/1507.02822.pdf, equation (4).
-        self.beta = beta
+        self.jump_size = jump_size  # see https://arxiv.org/pdf/1507.02822.pdf, equation (4).
+        self.mean_reversion_speed = mean_reversion_speed
         super().__init__(
-            min_value=np.array([0, 0]),
-            max_value=self._get_max_arrival_rate(),
+            min_value=np.array([[0, 0]]),
+            max_value=np.array([[1,1]])*self._get_max_arrival_rate(),
             step_size=step_size,
             terminal_time=terminal_time,
-            initial_state=baseline_arrival_rate,
+            initial_state=np.ones((num_trajectories,2))*baseline_arrival_rate,
+            num_trajectories = num_trajectories,
             seed=seed,
         )
 
     def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> np.ndarray:
         self.current_state = (
             self.current_state
-            + self.beta * (self.baseline_arrival_rate - self.current_state) * self.step_size
-            + self.alpha * arrivals
+            + self.mean_reversion_speed * (self.baseline_arrival_rate - self.current_state) * self.step_size * np.ones((self.num_trajectories, 2))
+            + self.jump_size * arrivals 
         )
         return self.current_state
 
     def get_arrivals(self) -> np.ndarray:
-        unif = self.rng.uniform(size=2)
+        unif = self.rng.uniform(size=(self.num_trajectories, 2))
         return unif < self.current_state * self.step_size
 
     def _get_max_arrival_rate(self):
-        return self.baseline_arrival_rate * 10  # TODO: Improve this with 4*std
-
-    # TODO: https://math.stackexchange.com/questions/4047342/expectation-of-hawkes-process-with-exponential-kernel
+        return self.baseline_arrival_rate * 10  
+    # TODO: Improve this with 4*std
+    # See: https://math.stackexchange.com/questions/4047342/expectation-of-hawkes-process-with-exponential-kernel

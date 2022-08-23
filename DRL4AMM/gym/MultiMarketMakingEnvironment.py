@@ -130,7 +130,9 @@ class MultiMarketMakingEnvironment(gym.Env):
         self._clip_inventory_and_cash()
         self.state[:,2] += self.dt
         self.state[:,2] = np.minimum(self.state[:,2], self.terminal_time)
-
+        self.state = self._get_current_state()  # Discuss with Joe why not revert to self.cash, self.inventory, self.time as opposed to having to update state with an unknown number of columns
+        
+        
     @property
     def midprice(self):
         return self.midprice_model.current_state[...,0]
@@ -191,6 +193,13 @@ class MultiMarketMakingEnvironment(gym.Env):
         initial_state = np.append(initial_state, self.arrival_model.current_state, axis=1)
         initial_state = np.append(initial_state, self.fill_probability_model.current_state, axis=1)
         return initial_state
+
+    def _get_current_state(self)-> np.ndarray:
+        state = self.state[:,0:3]
+        state = np.append(state, self.midprice_model.current_state, axis=1)
+        state = np.append(state, self.arrival_model.current_state, axis=1)
+        state = np.append(state, self.fill_probability_model.current_state, axis=1)
+        return state
 
     def _get_observation_space(self) -> gym.spaces.Space:
         """The observation space consists of a numpy array containg the agent's cash, the agent's inventory and the

@@ -1,6 +1,6 @@
 import gym
 import numpy as np
-from ray.rllib.train import torch
+import torch
 
 from DRL4AMM.agents.Agent import Agent
 

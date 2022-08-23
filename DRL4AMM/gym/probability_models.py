@@ -166,7 +166,7 @@ class GeometricBrownianMotionMidpriceModel(MidpriceModel):
         self.volatility = volatility
         self.terminal_time = terminal_time
         super().__init__(
-            min_value = np.array([[initial_price - (self._get_max_value(initial_price, terminal_time) - initial_price)]]),
+            min_value=np.array([[initial_price - (self._get_max_value(initial_price, terminal_time) - initial_price)]]),
             max_value=np.array([[self._get_max_value(initial_price, terminal_time)]]),
             step_size=step_size,
             terminal_time=terminal_time,
@@ -259,19 +259,22 @@ class HawkesArrivalModel(ArrivalModel):
         self.mean_reversion_speed = mean_reversion_speed
         super().__init__(
             min_value=np.array([[0, 0]]),
-            max_value=np.array([[1,1]])*self._get_max_arrival_rate(),
+            max_value=np.array([[1, 1]]) * self._get_max_arrival_rate(),
             step_size=step_size,
             terminal_time=terminal_time,
-            initial_state=np.ones((num_trajectories,2))*baseline_arrival_rate,
-            num_trajectories = num_trajectories,
+            initial_state=np.ones((num_trajectories, 2)) * baseline_arrival_rate,
+            num_trajectories=num_trajectories,
             seed=seed,
         )
 
     def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> np.ndarray:
         self.current_state = (
             self.current_state
-            + self.mean_reversion_speed * (self.baseline_arrival_rate - self.current_state) * self.step_size * np.ones((self.num_trajectories, 2))
-            + self.jump_size * arrivals 
+            + self.mean_reversion_speed
+            * (self.baseline_arrival_rate - self.current_state)
+            * self.step_size
+            * np.ones((self.num_trajectories, 2))
+            + self.jump_size * arrivals
         )
         return self.current_state
 
@@ -280,6 +283,7 @@ class HawkesArrivalModel(ArrivalModel):
         return unif < self.current_state * self.step_size
 
     def _get_max_arrival_rate(self):
-        return self.baseline_arrival_rate * 10  
+        return self.baseline_arrival_rate * 10
+
     # TODO: Improve this with 4*std
     # See: https://math.stackexchange.com/questions/4047342/expectation-of-hawkes-process-with-exponential-kernel

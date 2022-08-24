@@ -39,7 +39,7 @@ class CjCriterion(RewardFunction):
     def calculate(
         self, current_state: np.ndarray, action: np.ndarray, next_state: np.ndarray, is_terminal_step: bool = False
     ) -> float:
-        dt = next_state[2] - current_state[2]
+        dt = next_state[:, 2] - current_state[:, 2]
         return (
             self.pnl.calculate(current_state, action, next_state, is_terminal_step)
             - dt * self.phi * (next_state[:, 1] - current_state[:, 1]) ** 2

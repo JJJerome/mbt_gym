@@ -262,7 +262,7 @@ class HawkesArrivalModel(ArrivalModel):
             max_value=np.array([[1, 1]]) * self._get_max_arrival_rate(),
             step_size=step_size,
             terminal_time=terminal_time,
-            initial_state= baseline_arrival_rate,
+            initial_state=baseline_arrival_rate,
             num_trajectories=num_trajectories,
             seed=seed,
         )
@@ -271,7 +271,7 @@ class HawkesArrivalModel(ArrivalModel):
         self.current_state = (
             self.current_state
             + self.mean_reversion_speed
-            * (np.ones((self.num_trajectories, 2))*self.baseline_arrival_rate - self.current_state)
+            * (np.ones((self.num_trajectories, 2)) * self.baseline_arrival_rate - self.current_state)
             * self.step_size
             * np.ones((self.num_trajectories, 2))
             + self.jump_size * arrivals

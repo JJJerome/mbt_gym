@@ -6,16 +6,15 @@ from pydantic import NonNegativeFloat
 
 from DRL4AMM.agents.Agent import Agent
 from DRL4AMM.gym.MarketMakingEnvironment import MarketMakingEnvironment
-from DRL4AMM.rewards.RewardFunctions import CjCriterion
 
 
 class RandomAgent(Agent):
-    def __init__(self, action_space: gym.spaces.Space, seed: int = None):
-        self.action_space = action_space
-        self.action_space.seed(seed)
+    def __init__(self, env: gym.Env, seed: int = None):
+        self.env = env
+        self.env.action_space.seed(seed)
 
     def get_action(self, state: np.ndarray) -> np.ndarray:
-        return self.action_space.sample()
+        return self.env.action_space.sample().reshape(1, -1)
 
 
 class FixedActionAgent(Agent):

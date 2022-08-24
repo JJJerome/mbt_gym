@@ -14,15 +14,16 @@ class RandomAgent(Agent):
         self.env.action_space.seed(seed)
 
     def get_action(self, state: np.ndarray) -> np.ndarray:
-        return self.env.action_space.sample().reshape(1, -1)
+        return np.repeat(self.env.action_space.sample().reshape(1, -1), self.env.num_trajectories, axis = 0)
 
 
 class FixedActionAgent(Agent):
-    def __init__(self, fixed_action: tuple):
+    def __init__(self, fixed_action: tuple, env:gym.Env):
         self.fixed_action = fixed_action
+        self.env = env
 
     def get_action(self, state: np.ndarray) -> np.ndarray:
-        return self.fixed_action
+        return np.repeat(self.fixed_action.reshape(1, -1), self.env.num_trajectories, axis=0)
 
 
 class FixedSpreadAgent(Agent):

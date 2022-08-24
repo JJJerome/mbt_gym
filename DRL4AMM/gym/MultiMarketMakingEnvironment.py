@@ -1,10 +1,8 @@
-from copy import copy
+from copy import copy, deepcopy
 import gym
 import numpy as np
 
-from gym.envs.registration import EnvSpec
 from gym.spaces import Box
-from math import isclose
 
 from DRL4AMM.gym.probability_models import (
     MidpriceModel,
@@ -15,7 +13,7 @@ from DRL4AMM.gym.probability_models import (
     ExponentialFillFunction,
 )
 from DRL4AMM.gym.tracking.InfoCalculator import InfoCalculator, ActionInfoCalculator
-from DRL4AMM.rewards.RewardFunctions import RewardFunction, CjCriterion, PnL
+from DRL4AMM.rewards.RewardFunctions import RewardFunction, PnL
 
 ACTION_SPACES = ["touch", "limit", "limit_and_market"]
 
@@ -38,7 +36,7 @@ class MultiMarketMakingEnvironment(gym.Env):
         max_cash: float = None,
         max_stock_price: float = None,
         max_depth: float = None,
-        market_order_penalty: float = None,
+        minimum_tick_size: float = None,
         info_calculator: InfoCalculator = None,
         seed: int = None,
         num_trajectories: int = 1000,
@@ -47,7 +45,7 @@ class MultiMarketMakingEnvironment(gym.Env):
         self.terminal_time = terminal_time
         self.num_trajectories = num_trajectories
         self.n_steps = n_steps
-        self.reward_function = reward_function or PnL()  # CjCriterion(phi=2 * 10 ** (-4), alpha=0.0001)
+        self.reward_function = reward_function or PnL()
         self.midprice_model: MidpriceModel = midprice_model or BrownianMotionMidpriceModel(
             step_size=self.terminal_time / self.n_steps, num_trajectories=num_trajectories
         )
@@ -70,29 +68,31 @@ class MultiMarketMakingEnvironment(gym.Env):
         self.initial_state = self._get_initial_state()
         self.observation_space = self._get_observation_space()
         self.action_space = self._get_action_space()
-        self.book_half_spread = market_order_penalty
+        self.minimum_tick_size = minimum_tick_size
         self.info_calculator = info_calculator or ActionInfoCalculator()
         self.midprice_index_range = self._get_midprice_index_range()
         self.arrival_index_range = self._get_fill_index_range()
         self.fill_index_range = self._get_fill_index_range()
         self._check_params()
         self.empty_infos = [{} for _ in range(self.num_trajectories)]
+        ones = np.ones((self.num_trajectories, 1))
+        self.multiplier = np.append(-ones, ones, axis=1)
 
     def reset(self):
         self.midprice_model.reset()
         self.arrival_model.reset()
         self.fill_probability_model.reset()
-        self.state = self._get_initial_state()
-        return self.state
+        self.state = self.initial_state.copy()
+        return self.initial_state
 
     def step(self, action: np.ndarray):
-        current_state = copy(self.state)
+        current_state = deepcopy(self.state)
         next_state = self._update_state(action)
         done = self.state[0, 2] >= self.terminal_time - self.dt / 2
         dones = np.full((self.num_trajectories,), done, dtype=bool)
         rewards = self.reward_function.calculate(current_state, action, next_state, done)
         infos = self.empty_infos
-        return copy(self.state)[:, 1:3], rewards, dones, infos  # TODO: sort this by using a wrapper
+        return self.state.copy(), rewards, dones, infos
 
     def _get_max_cash(self) -> float:
         return self.max_inventory * self.max_stock_price
@@ -103,51 +103,46 @@ class MultiMarketMakingEnvironment(gym.Env):
     def _update_state(self, action: np.ndarray) -> np.ndarray:
         arrivals = self.arrival_model.get_arrivals()
         if self.action_type in ["limit", "limit_and_market"]:
-            depths = np.stack((self.limit_buy_depth(action), self.limit_sell_depth(action)), axis=1)
+            depths = self.limit_depths(action)
             fills = self.fill_probability_model.get_hypothetical_fills(depths)
         else:
-            fills = np.stack((self.post_buy_at_touch(action), self.post_sell_at_touch(action)), axis=1)
+            fills = self.post_at_touch(action)
+        self._update_agent_state(arrivals, fills, action)
         self._update_market_state(arrivals, fills, action)
-        self._update_agent_state(arrivals, fills, action)  # TODO
         return self.state
 
     def _update_market_state(self, arrivals, fills, action):
-        self.arrival_model.update(arrivals, fills, action)  # TODO
-        self.midprice_model.update(arrivals, fills, action)  # TODO
-        self.fill_probability_model.update(arrivals, fills, action)  # TODO
+        self.arrival_model.update(arrivals, fills, action)
+        self.midprice_model.update(arrivals, fills, action)
+        self.fill_probability_model.update(arrivals, fills, action)
         self.state[:, self.midprice_index_range[0] : self.midprice_index_range[1]] = self.midprice_model.current_state
         self.state[:, self.arrival_index_range[0] : self.arrival_index_range[1]] = self.arrival_model.current_state
         self.state[:, self.fill_index_range[0] : self.fill_index_range[1]] = self.fill_probability_model.current_state
 
     def _update_agent_state(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
-        fill_multiplier = np.append(-np.ones((self.num_trajectories, 1)), np.ones((self.num_trajectories, 1)), axis=1)
         if self.action_type == "limit_and_market":
             mo_buy = np.single(self.market_order_buy(action) > 0.5)
             mo_sell = np.single(self.market_order_sell(action) > 0.5)
-            best_bid = self.midprice_model.current_state - self.book_half_spread
-            best_ask = self.midprice_model.current_state + self.book_half_spread
+            best_bid = self.midprice - self.minimum_tick_size
+            best_ask = self.midprice + self.minimum_tick_size
             self.state[:, 0] += mo_sell * best_bid - mo_buy * best_ask
             self.state[:, 1] += mo_buy - mo_sell
-        self.state[:, 1] += np.sum(arrivals * fills * -fill_multiplier)
+        self.state[:, 1] += np.sum(arrivals * fills * -self.multiplier, axis=1)
         if self.action_type == "touch":
             self.state[:, 0] += np.sum(
-                fill_multiplier
-                * arrivals
-                * fills
-                * (np.reshape(self.midprice, (-1, 1)) + self.book_half_spread * fill_multiplier)
+                self.multiplier * arrivals * fills * (self.midprice + self.minimum_tick_size * self.multiplier), axis=1
             )
         else:
-            depths = np.stack((self.limit_buy_depth(action), self.limit_sell_depth(action)), axis=1)
             self.state[:, 0] += np.sum(
-                fill_multiplier * arrivals * fills * (np.reshape(self.midprice, (-1, 1)) + depths * fill_multiplier)
+                self.multiplier * arrivals * fills * (self.midprice + self.limit_depths(action) * self.multiplier),
+                axis=1,
             )
         self._clip_inventory_and_cash()
         self.state[:, 2] += self.dt
-        self.state[:, 2] = np.minimum(self.state[:, 2], self.terminal_time)
 
     @property
     def midprice(self):
-        return self.midprice_model.current_state[..., 0]
+        return self.midprice_model.current_state[:, 0].reshape(-1, 1)
 
     def _clip_inventory_and_cash(self):
         self.state[:, 1] = self._clip(self.state[:, 1], -self.max_inventory, self.max_inventory, cash_flag=False)
@@ -161,17 +156,11 @@ class MultiMarketMakingEnvironment(gym.Env):
             print(f"Clipping agent's inventory from {not_clipped} to {clipped}.")
         return clipped
 
-    def limit_buy_depth(self, action: np.ndarray):
+    def limit_depths(self, action: np.ndarray):
         if self.action_type in ["limit", "limit_and_market"]:
-            return action[..., 0]
+            return action[:, 0:2]
         else:
             raise Exception('Bid depth only exists for action_type in ["limit", "limit_and_market"].')
-
-    def limit_sell_depth(self, action: np.ndarray):
-        if self.action_type in ["limit", "limit_and_market"]:
-            return action[..., 1]
-        else:
-            raise Exception('Ask depth only exists for action_type in ["limit", "limit_and_market"].')
 
     def market_order_buy(self, action: np.ndarray):
         if self.action_type == "limit_and_market":
@@ -185,24 +174,18 @@ class MultiMarketMakingEnvironment(gym.Env):
         else:
             raise Exception('Market order sell action only exists for action_type == "limit_and_market".')
 
-    def post_buy_at_touch(self, action: np.ndarray):
+    def post_at_touch(self, action: np.ndarray):
         if self.action_type == "touch":
-            return action[..., 0]
-        else:
-            raise Exception('Post buy at touch action only exists for action_type == "touch".')
-
-    def post_sell_at_touch(self, action: np.ndarray):
-        if self.action_type == "touch":
-            return action[..., 1]
+            return action[:, 0:2]
         else:
             raise Exception('Post buy at touch action only exists for action_type == "touch".')
 
     def _get_initial_state(self) -> np.ndarray:
         scalar_initial_state = np.array([[self.initial_cash, self.initial_inventory, 0.0]])
         initial_state = np.repeat(scalar_initial_state, self.num_trajectories, axis=0)
-        initial_state = np.append(initial_state, self.midprice_model.current_state, axis=1)
-        initial_state = np.append(initial_state, self.arrival_model.current_state, axis=1)
-        initial_state = np.append(initial_state, self.fill_probability_model.current_state, axis=1)
+        initial_state = np.append(initial_state, self.midprice_model.initial_vector_state, axis=1)
+        initial_state = np.append(initial_state, self.arrival_model.initial_vector_state, axis=1)
+        initial_state = np.append(initial_state, self.fill_probability_model.initial_vector_state, axis=1)
         return initial_state
 
     def _get_current_state(self) -> np.ndarray:
@@ -235,31 +218,29 @@ class MultiMarketMakingEnvironment(gym.Env):
         if self.action_type == "touch":
             return gym.spaces.MultiBinary(2)  # agent chooses spread on bid and ask
         if self.action_type == "limit":
-            max_depth = self.fill_probability_model.max_depth
-            return gym.spaces.Box(low=0.0, high=max_depth, shape=(2,))  # agent chooses spread on bid and ask
+            return gym.spaces.Box(low=0.0, high=self.max_depth, shape=(2,))  # agent chooses spread on bid and ask
         if self.action_type == "limit_and_market":
-            max_depth = self.fill_probability_model.max_depth
             return gym.spaces.Box(
                 low=np.zeros(
                     4,
                 ),
-                high=np.array(max_depth, max_depth, 1, 1),
+                high=np.array(self.max_depth, self.max_depth, 1, 1),
                 shape=(2,),
             )
 
     def _get_midprice_index_range(self):
         min_midprice_index = 3
-        max_midprice_index = 3 + self.midprice_model.initial_vector_state[1]
+        max_midprice_index = 3 + self.midprice_model.initial_vector_state.shape[1]
         return min_midprice_index, max_midprice_index
 
     def _get_arrival_index_range(self):
         min_arrival_index = self._get_midprice_index_range()[1]
-        max_arrival_index = self._get_midprice_index_range()[1] + self.arrival_model.initial_vector_state[1]
+        max_arrival_index = self._get_midprice_index_range()[1] + self.arrival_model.initial_vector_state.shape[1]
         return min_arrival_index, max_arrival_index
 
     def _get_fill_index_range(self):
-        min_fill_index = self._get_arrival_index_range()
-        max_fill_index = self._get_arrival_index_range() + self.fill_probability_model.initial_vector_state[1]
+        min_fill_index = self._get_arrival_index_range()[1]
+        max_fill_index = self._get_arrival_index_range()[1] + self.fill_probability_model.initial_vector_state.shape[1]
         return min_fill_index, max_fill_index
 
     @staticmethod

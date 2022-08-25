@@ -6,6 +6,10 @@ import numpy as np
 from pydantic import NonNegativeFloat, PositiveFloat
 from DRL4AMM.gym.models import Action
 
+CASH_INDEX = 0
+INVENTORY_INDEX = 1
+TIME_INDEX = 2
+
 
 class RewardFunction(metaclass=abc.ABCMeta):
     @abc.abstractmethod
@@ -22,8 +26,10 @@ class PnL(RewardFunction):
         self, current_state: np.ndarray, action: np.ndarray, next_state: np.ndarray, is_terminal_step: bool = False
     ) -> float:
         assert len(current_state.shape) > 1, "Reward functions must be calculated on state matrices."
-        current_market_value = current_state[:, 0] + current_state[:, 1] * current_state[:, 3]
-        next_market_value = next_state[:, 0] + next_state[:, 1] * next_state[:, 3]
+        current_market_value = (
+            current_state[:, CASH_INDEX] + current_state[:, INVENTORY_INDEX] * current_state[:, TIME_INDEX]
+        )
+        next_market_value = next_state[:, CASH_INDEX] + next_state[:, INVENTORY_INDEX] * next_state[:, TIME_INDEX]
         return next_market_value - current_market_value
 
 
@@ -42,8 +48,10 @@ class CjCriterion(RewardFunction):
         dt = next_state[:, 2] - current_state[:, 2]
         return (
             self.pnl.calculate(current_state, action, next_state, is_terminal_step)
-            - dt * self.phi * (next_state[:, 1] - current_state[:, 1]) ** 2
-            - self.alpha * int(is_terminal_step) * (next_state[:, 1] - current_state[:, 1]) ** 2
+            - dt * self.phi * (next_state[:, INVENTORY_INDEX] - current_state[:, INVENTORY_INDEX]) ** 2
+            - self.alpha
+            * int(is_terminal_step)
+            * (next_state[:, INVENTORY_INDEX] - current_state[:, INVENTORY_INDEX]) ** 2
         )
 
 
@@ -55,7 +63,10 @@ class TerminalExponentialUtility(RewardFunction):
         self, current_state: np.ndarray, action: Action, next_state: np.ndarray, is_terminal_step: bool = False
     ) -> float:
         return (
-            -np.exp(-self.risk_aversion * (next_state[:, 0] + next_state[:, 1] * next_state[:, 3]))
+            -np.exp(
+                -self.risk_aversion
+                * (next_state[:, CASH_INDEX] + next_state[:, INVENTORY_INDEX] * next_state[:, TIME_INDEX])
+            )
             if is_terminal_step
             else 0
         )
@@ -84,8 +95,8 @@ class InventoryAdjustedPnL(RewardFunction):
             self.pnl.calculate(current_state, action, next_state, is_terminal_step)
             - dt
             * self.per_step_inventory_aversion
-            * (next_state[:, 1] - current_state[:, 1]) ** self.inventory_exponent
+            * (next_state[:, INVENTORY_INDEX] - current_state[:, INVENTORY_INDEX]) ** self.inventory_exponent
             - self.terminal_inventory_aversion
             * int(is_terminal_step)
-            * (next_state[:, 1] - current_state[:, 1]) ** self.inventory_exponent
+            * (next_state[:, INVENTORY_INDEX] - current_state[:, INVENTORY_INDEX]) ** self.inventory_exponent
         )

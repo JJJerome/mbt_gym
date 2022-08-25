@@ -1,11 +1,12 @@
 import gym
 import numpy as np
 import warnings
+from scipy.linalg import expm
 
 from pydantic import NonNegativeFloat
 
 from DRL4AMM.agents.Agent import Agent
-from DRL4AMM.gym.MarketMakingEnvironment import MarketMakingEnvironment
+from DRL4AMM.gym.TradingEnvironment import TradingEnvironment
 
 
 class RandomAgent(Agent):
@@ -43,10 +44,10 @@ class HumanAgent(Agent):
 
 
 class AvellanedaStoikovAgent(Agent):
-    def __init__(self, risk_aversion: NonNegativeFloat = 0.1, env: MarketMakingEnvironment = None):
+    def __init__(self, risk_aversion: NonNegativeFloat = 0.1, env: TradingEnvironment = None):
         self.risk_aversion = risk_aversion
-        self.env = env or MarketMakingEnvironment()
-        assert isinstance(self.env, MarketMakingEnvironment)
+        self.env = env or TradingEnvironment()
+        assert isinstance(self.env, TradingEnvironment)
         self.terminal_time = self.env.terminal_time
         self.volatility = self.env.midprice_model.volatility
         self.rate_of_arrival = self.env.arrival_model.intensity
@@ -81,12 +82,12 @@ class CarteaJaimungalAgent(Agent):
         self,
         phi: float = 2 * 10 ** (-4),
         alpha: float = 0.0001,
-        env: MarketMakingEnvironment = None,
+        env: TradingEnvironment = None,
         max_inventory: int = 10,
     ):
         self.phi = phi
         self.alpha = alpha
-        self.env = env or MarketMakingEnvironment()
+        self.env = env or TradingEnvironment()
         assert self.env.action_type == "limit"
         self.terminal_time = self.env.terminal_time
         self.lambdas = self.env.arrival_model.intensity
@@ -94,28 +95,33 @@ class CarteaJaimungalAgent(Agent):
         self.max_inventory = max_inventory
         self.a_matrix, self.z_vector = self._calculate_a_and_z()
         self.large_depth = 10_000
+        self.num_trajectories = self.env.num_trajectories
 
     def get_action(self, state: np.ndarray):
-        inventory = int(state[1])
-        current_time = state[2]
-        action = np.array(self._calculate_deltas(current_time, inventory))
+        action = np.zeros(shape=(self.num_trajectories,2))
+        for iq, q in enumerate(state[:,1]):
+            inventory = q
+            current_time = state[iq,2]
+            aux_action = np.array(self._calculate_deltas(current_time, inventory))
+            action[iq,:] = aux_action[:,0]
         return action
 
     def _calculate_deltas(self, current_time: float, inventory: int):
         h_t = self._calculate_ht(current_time)
         # If the inventory goes above the max level, we quote a large depth to bring it back and quote on the opposite
         # side as if we had an inventory equal to sign(inventory) * self.max_inventory.
-        index = np.clip(self.max_inventory + inventory, 0, 2 * self.max_inventory)
+        index = np.clip(self.max_inventory - inventory, 0, 2 * self.max_inventory)
+        index = int(index)
         h_0 = h_t[index]
         if inventory >= self.max_inventory:
             delta_minus = self.large_depth
         else:
-            h_plus_one = h_t[index + 1]
+            h_plus_one = h_t[index - 1]
             delta_minus = 1 / self.kappa - h_plus_one + h_0
         if inventory <= -self.max_inventory:
             delta_plus = self.large_depth
         else:
-            h_minus_one = h_t[index - 1]
+            h_minus_one = h_t[index + 1]
             delta_plus = 1 / self.kappa - h_minus_one + h_0
         return delta_minus, delta_plus
 
@@ -125,16 +131,16 @@ class CarteaJaimungalAgent(Agent):
 
     def _calculate_omega(self, current_time: float):
         """This is Equation (10.11) from [CJP15]."""
-        return np.matmul(np.exp(self.a_matrix * (self.terminal_time - current_time)), self.z_vector)
+        return np.matmul(expm(self.a_matrix * (self.terminal_time - current_time)), self.z_vector)
 
     def _calculate_a_and_z(self):
         matrix_size = 2 * self.max_inventory + 1
         Amatrix = np.zeros(shape=(matrix_size, matrix_size))
-        z_vector = np.zeros(shape=matrix_size)
+        z_vector = np.zeros(shape=(matrix_size,1))
         for i in range(matrix_size):
-            inventory = i - self.max_inventory
+            inventory = self.max_inventory - i
             Amatrix[i, i] = -self.phi * self.kappa * inventory**2
-            z_vector[i] = np.exp(-self.alpha * self.kappa * inventory**2)
+            z_vector[i,0] = np.exp(-self.alpha * self.kappa * inventory**2)
             if i + 1 < matrix_size:
                 Amatrix[i, i + 1] = self.lambdas[0] * np.exp(-1)
             if i > 0:

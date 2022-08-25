@@ -36,8 +36,6 @@ class PnL(RewardFunction):
         return next_market_value - current_market_value
 
 
-# observation space is ([[stock_price, cash, inventory, time]])
-
 class InventoryAdjustedPnL(RewardFunction):
     def __init__(
         self,
@@ -65,28 +63,8 @@ class InventoryAdjustedPnL(RewardFunction):
         )
 
 
+# Cartea and Jaimungal criterion is the same as inventory adjusted PnL
 CjCriterion = InventoryAdjustedPnL
-
-
-# class CjCriterion(RewardFunction):
-#     def __init__(self, phi: NonNegativeFloat = 0.01, alpha: NonNegativeFloat = 0.01):
-#         self.phi = phi
-#         self.alpha = alpha
-#         self.pnl = PnL()
-#
-#     """Cartea-Jaimungal type performance."""
-#
-#     def calculate(
-#         self, current_state: np.ndarray, action: np.ndarray, next_state: np.ndarray, is_terminal_step: bool = False
-#     ) -> float:
-#         dt = next_state[:, TIME_INDEX] - current_state[:, TIME_INDEX]
-#         return (
-#             self.pnl.calculate(current_state, action, next_state, is_terminal_step)
-#             - dt * self.phi * (next_state[:, INVENTORY_INDEX] - current_state[:, INVENTORY_INDEX]) ** 2
-#             - self.alpha
-#             * int(is_terminal_step)
-#             * (next_state[:, INVENTORY_INDEX] - current_state[:, INVENTORY_INDEX]) ** 2
-#         )
 
 
 class TerminalExponentialUtility(RewardFunction):

@@ -1,4 +1,5 @@
 import abc
+from typing import Union
 
 import numpy as np
 
@@ -10,7 +11,7 @@ class RewardFunction(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def calculate(
         self, current_state: np.ndarray, action: np.ndarray, next_state: np.ndarray, is_terminal_step: bool = False
-    ) -> float:
+    ) -> Union[float, np.ndarray]:
         pass
 
 
@@ -20,12 +21,13 @@ class PnL(RewardFunction):
     def calculate(
         self, current_state: np.ndarray, action: np.ndarray, next_state: np.ndarray, is_terminal_step: bool = False
     ) -> float:
-        current_market_value = current_state[0] + current_state[1] * current_state[3]
-        next_market_value = next_state[0] + next_state[1] * next_state[3]
+        assert len(current_state.shape) > 1, "Reward functions must be calculated on state matrices."
+        current_market_value = current_state[:, 0] + current_state[:, 1] * current_state[:, 3]
+        next_market_value = next_state[:, 0] + next_state[:, 1] * next_state[:, 3]
         return next_market_value - current_market_value
 
 
-# observation space is (stock_price, cash, inventory, time)
+# observation space is ([[stock_price, cash, inventory, time]])
 class CjCriterion(RewardFunction):
     def __init__(self, phi: NonNegativeFloat = 0.01, alpha: NonNegativeFloat = 0.01):
         self.phi = phi
@@ -37,11 +39,11 @@ class CjCriterion(RewardFunction):
     def calculate(
         self, current_state: np.ndarray, action: np.ndarray, next_state: np.ndarray, is_terminal_step: bool = False
     ) -> float:
-        dt = next_state[2] - current_state[2]
+        dt = next_state[:, 2] - current_state[:, 2]
         return (
             self.pnl.calculate(current_state, action, next_state, is_terminal_step)
-            - dt * self.phi * (next_state[1] - current_state[1]) ** 2
-            - self.alpha * int(is_terminal_step) * (next_state[1] - current_state[1]) ** 2
+            - dt * self.phi * (next_state[:, 1] - current_state[:, 1]) ** 2
+            - self.alpha * int(is_terminal_step) * (next_state[:, 1] - current_state[:, 1]) ** 2
         )
 
 
@@ -52,7 +54,11 @@ class TerminalExponentialUtility(RewardFunction):
     def calculate(
         self, current_state: np.ndarray, action: Action, next_state: np.ndarray, is_terminal_step: bool = False
     ) -> float:
-        return -np.exp(-self.risk_aversion * (next_state[0] + next_state[1] * next_state[3])) if is_terminal_step else 0
+        return (
+            -np.exp(-self.risk_aversion * (next_state[:, 0] + next_state[:, 1] * next_state[:, 3]))
+            if is_terminal_step
+            else 0
+        )
 
 
 # TODO: note that CJ_criterion is just InventoryAdjustedPnL with inventory_exponent = 2
@@ -73,11 +79,13 @@ class InventoryAdjustedPnL(RewardFunction):
     def calculate(
         self, current_state: np.ndarray, action: np.ndarray, next_state: np.ndarray, is_terminal_step: bool = False
     ) -> float:
-        dt = next_state[2] - current_state[2]
+        dt = next_state[:, 2] - current_state[:, 2]
         return (
             self.pnl.calculate(current_state, action, next_state, is_terminal_step)
-            - dt * self.per_step_inventory_aversion * (next_state[1] - current_state[1]) ** self.inventory_exponent
+            - dt
+            * self.per_step_inventory_aversion
+            * (next_state[:, 1] - current_state[:, 1]) ** self.inventory_exponent
             - self.terminal_inventory_aversion
             * int(is_terminal_step)
-            * (next_state[1] - current_state[1]) ** self.inventory_exponent
+            * (next_state[:, 1] - current_state[:, 1]) ** self.inventory_exponent
         )

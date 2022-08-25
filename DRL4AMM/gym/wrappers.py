@@ -26,7 +26,7 @@ class ReduceStateSizeWrapper(gym.Wrapper):
         Reset the environment
         """
         obs = self.env.reset()
-        return obs[self.list_of_state_indices]
+        return obs[:, self.list_of_state_indices]
 
     def step(self, action):
         """
@@ -34,7 +34,7 @@ class ReduceStateSizeWrapper(gym.Wrapper):
         :return: (np.ndarray, float, bool, dict) observation, reward, is the episode over?, additional informations
         """
         obs, reward, done, info = self.env.step(action)
-        return obs[self.list_of_state_indices], reward, done, info
+        return obs[:, self.list_of_state_indices], reward, done, info
 
     @property
     def spec(self):

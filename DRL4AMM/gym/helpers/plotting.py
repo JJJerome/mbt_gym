@@ -10,10 +10,12 @@ from DRL4AMM.gym.helpers.generate_trajectory import generate_trajectory
 
 
 def plot_trajectory(env: gym.Env, agent: Agent, seed: int = None):
+    assert env.num_trajectories == 1, "Plotting a trajectory can only be done when env.num_trajectories == 1."
     timestamps = get_timestamps(env)
     observations, actions, rewards = generate_trajectory(env, agent, seed)
+    observations = observations.reshape(-1, env.observation_space.shape[0])
+    actions = actions.reshape(-1, 2)
     cum_rewards = np.cumsum(rewards)
-    observations = np.array(observations)
     cash_holdings = observations[:, 0]
     inventory = observations[:, 1]
     asset_prices = observations[:, 3]
@@ -27,8 +29,8 @@ def plot_trajectory(env: gym.Env, agent: Agent, seed: int = None):
     ax3.plot(timestamps, inventory, label="inventory", color="r")
     ax3a = ax3.twinx()
     ax3a.plot(timestamps, cash_holdings, label="cash holdings")
-    ax4.plot(timestamps[0:-1], [action[0] for action in actions], label="bid half spread")
-    ax4.plot(timestamps[0:-1], [action[1] for action in actions], label="ask half spread")
+    ax4.plot(timestamps[0:-1], actions[0, :], label="bid half spread")
+    ax4.plot(timestamps[0:-1], actions[1, :], label="ask half spread")
     ax3.legend()
     ax4.legend()
     plt.show()

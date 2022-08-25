@@ -18,7 +18,7 @@ from DRL4AMM.rewards.RewardFunctions import RewardFunction, PnL
 ACTION_SPACES = ["touch", "limit", "limit_and_market"]
 
 
-class MultiMarketMakingEnvironment(gym.Env):
+class TradingEnvironment(gym.Env):
     metadata = {"render.modes": ["human"]}
 
     def __init__(
@@ -41,7 +41,7 @@ class MultiMarketMakingEnvironment(gym.Env):
         seed: int = None,
         num_trajectories: int = 1000,
     ):
-        super(MultiMarketMakingEnvironment, self).__init__()
+        super(TradingEnvironment, self).__init__()
         self.terminal_time = terminal_time
         self.num_trajectories = num_trajectories
         self.n_steps = n_steps

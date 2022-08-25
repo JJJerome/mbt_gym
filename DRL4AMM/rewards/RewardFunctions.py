@@ -9,6 +9,7 @@ from DRL4AMM.gym.models import Action
 CASH_INDEX = 0
 INVENTORY_INDEX = 1
 TIME_INDEX = 2
+ASSET_PRICE_INDEX = 3
 
 
 class RewardFunction(metaclass=abc.ABCMeta):
@@ -27,51 +28,16 @@ class PnL(RewardFunction):
     ) -> float:
         assert len(current_state.shape) > 1, "Reward functions must be calculated on state matrices."
         current_market_value = (
-            current_state[:, CASH_INDEX] + current_state[:, INVENTORY_INDEX] * current_state[:, TIME_INDEX]
+            current_state[:, CASH_INDEX] + current_state[:, INVENTORY_INDEX] * current_state[:, ASSET_PRICE_INDEX]
         )
-        next_market_value = next_state[:, CASH_INDEX] + next_state[:, INVENTORY_INDEX] * next_state[:, TIME_INDEX]
+        next_market_value = (
+            next_state[:, CASH_INDEX] + next_state[:, INVENTORY_INDEX] * next_state[:, ASSET_PRICE_INDEX]
+        )
         return next_market_value - current_market_value
 
 
-class CjCriterion(RewardFunction):
-    def __init__(self, phi: NonNegativeFloat = 0.01, alpha: NonNegativeFloat = 0.01):
-        self.phi = phi
-        self.alpha = alpha
-        self.pnl = PnL()
+# observation space is ([[stock_price, cash, inventory, time]])
 
-    """Cartea-Jaimungal type performance."""
-
-    def calculate(
-        self, current_state: np.ndarray, action: np.ndarray, next_state: np.ndarray, is_terminal_step: bool = False
-    ) -> float:
-        dt = next_state[:, TIME_INDEX] - current_state[:, TIME_INDEX]
-        return (
-            self.pnl.calculate(current_state, action, next_state, is_terminal_step)
-            - dt * self.phi * (next_state[:, INVENTORY_INDEX] - current_state[:, INVENTORY_INDEX]) ** 2
-            - self.alpha
-            * int(is_terminal_step)
-            * (next_state[:, INVENTORY_INDEX] - current_state[:, INVENTORY_INDEX]) ** 2
-        )
-
-
-class TerminalExponentialUtility(RewardFunction):
-    def __init__(self, risk_aversion: NonNegativeFloat = 0.1):
-        self.risk_aversion = risk_aversion
-
-    def calculate(
-        self, current_state: np.ndarray, action: Action, next_state: np.ndarray, is_terminal_step: bool = False
-    ) -> float:
-        return (
-            -np.exp(
-                -self.risk_aversion
-                * (next_state[:, CASH_INDEX] + next_state[:, INVENTORY_INDEX] * next_state[:, TIME_INDEX])
-            )
-            if is_terminal_step
-            else 0
-        )
-
-
-# TODO: note that CJ_criterion is just InventoryAdjustedPnL with inventory_exponent = 2
 class InventoryAdjustedPnL(RewardFunction):
     def __init__(
         self,
@@ -92,10 +58,50 @@ class InventoryAdjustedPnL(RewardFunction):
         dt = next_state[:, TIME_INDEX] - current_state[:, TIME_INDEX]
         return (
             self.pnl.calculate(current_state, action, next_state, is_terminal_step)
-            - dt
-            * self.per_step_inventory_aversion
-            * (next_state[:, INVENTORY_INDEX] - current_state[:, INVENTORY_INDEX]) ** self.inventory_exponent
+            - dt * self.per_step_inventory_aversion * next_state[:, INVENTORY_INDEX] ** self.inventory_exponent
             - self.terminal_inventory_aversion
             * int(is_terminal_step)
-            * (next_state[:, INVENTORY_INDEX] - current_state[:, INVENTORY_INDEX]) ** self.inventory_exponent
+            * next_state[:, INVENTORY_INDEX] ** self.inventory_exponent
         )
+
+
+CjCriterion = InventoryAdjustedPnL
+
+
+# class CjCriterion(RewardFunction):
+#     def __init__(self, phi: NonNegativeFloat = 0.01, alpha: NonNegativeFloat = 0.01):
+#         self.phi = phi
+#         self.alpha = alpha
+#         self.pnl = PnL()
+#
+#     """Cartea-Jaimungal type performance."""
+#
+#     def calculate(
+#         self, current_state: np.ndarray, action: np.ndarray, next_state: np.ndarray, is_terminal_step: bool = False
+#     ) -> float:
+#         dt = next_state[:, TIME_INDEX] - current_state[:, TIME_INDEX]
+#         return (
+#             self.pnl.calculate(current_state, action, next_state, is_terminal_step)
+#             - dt * self.phi * (next_state[:, INVENTORY_INDEX] - current_state[:, INVENTORY_INDEX]) ** 2
+#             - self.alpha
+#             * int(is_terminal_step)
+#             * (next_state[:, INVENTORY_INDEX] - current_state[:, INVENTORY_INDEX]) ** 2
+#         )
+
+
+class TerminalExponentialUtility(RewardFunction):
+    def __init__(self, risk_aversion: NonNegativeFloat = 0.1):
+        self.risk_aversion = risk_aversion
+
+    def calculate(
+        self, current_state: np.ndarray, action: Action, next_state: np.ndarray, is_terminal_step: bool = False
+    ) -> float:
+        return (
+            -np.exp(
+                -self.risk_aversion
+                * (next_state[:, CASH_INDEX] + next_state[:, INVENTORY_INDEX] * next_state[:, ASSET_PRICE_INDEX])
+            )
+            if is_terminal_step
+            else 0
+        )
+

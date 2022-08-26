@@ -64,6 +64,7 @@ class InventoryAdjustedPnL(RewardFunction):
 
 
 # Cartea and Jaimungal criterion is the same as inventory adjusted PnL
+
 CjCriterion = InventoryAdjustedPnL
 
 
@@ -82,4 +83,3 @@ class TerminalExponentialUtility(RewardFunction):
             if is_terminal_step
             else 0
         )
-

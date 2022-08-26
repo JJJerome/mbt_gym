@@ -1,17 +1,14 @@
-from copy import copy, deepcopy
+from copy import deepcopy
+from typing import Union, Tuple
+
 import gym
 import numpy as np
 
 from gym.spaces import Box
 
-from DRL4AMM.gym.probability_models import (
-    MidpriceModel,
-    FillProbabilityModel,
-    ArrivalModel,
-    BrownianMotionMidpriceModel,
-    PoissonArrivalModel,
-    ExponentialFillFunction,
-)
+from DRL4AMM.stochastic_processes.arrival_models import ArrivalModel, PoissonArrivalModel
+from DRL4AMM.stochastic_processes.fill_probability_models import FillProbabilityModel, ExponentialFillFunction
+from DRL4AMM.stochastic_processes.midprice_models import MidpriceModel, BrownianMotionMidpriceModel
 from DRL4AMM.gym.tracking.InfoCalculator import InfoCalculator, ActionInfoCalculator
 from DRL4AMM.rewards.RewardFunctions import RewardFunction, PnL
 
@@ -31,15 +28,15 @@ class TradingEnvironment(gym.Env):
         fill_probability_model: FillProbabilityModel = None,
         action_type: str = "limit",
         initial_cash: float = 0.0,
-        initial_inventory: int = 0,
-        max_inventory: int = 10_000,
+        initial_inventory: Union[int, Tuple[float, float]] = 0,  # Either a deterministic initial inventory, or a tuple
+        max_inventory: int = 10_000,  # representing the mean and variance of it.
         max_cash: float = None,
         max_stock_price: float = None,
         max_depth: float = None,
         minimum_tick_size: float = None,
         info_calculator: InfoCalculator = None,
         seed: int = None,
-        num_trajectories: int = 1000,
+        num_trajectories: int = 1,
     ):
         super(TradingEnvironment, self).__init__()
         self.terminal_time = terminal_time
@@ -56,16 +53,15 @@ class TradingEnvironment(gym.Env):
             step_size=self.terminal_time / self.n_steps, num_trajectories=num_trajectories
         )
         self.action_type = action_type
+        self.rng = np.random.default_rng(seed)
         self.initial_cash = initial_cash
         self.initial_inventory = initial_inventory
         self.max_inventory = max_inventory
-        self.state = self._get_initial_state()
+        self.state = self.initial_state
         self.max_stock_price = max_stock_price or self.midprice_model.max_value[0, 0]
         self.max_cash = max_cash or self._get_max_cash()
         self.max_depth = max_depth or self.fill_probability_model.max_depth
-        self.rng = np.random.default_rng(seed)
         self.dt = self.terminal_time / self.n_steps
-        self.initial_state = self._get_initial_state()
         self.observation_space = self._get_observation_space()
         self.action_space = self._get_action_space()
         self.minimum_tick_size = minimum_tick_size
@@ -82,8 +78,8 @@ class TradingEnvironment(gym.Env):
         self.midprice_model.reset()
         self.arrival_model.reset()
         self.fill_probability_model.reset()
-        self.state = self.initial_state.copy()
-        return self.initial_state
+        self.state = self.initial_state
+        return self.state
 
     def step(self, action: np.ndarray):
         current_state = deepcopy(self.state)
@@ -104,7 +100,7 @@ class TradingEnvironment(gym.Env):
         arrivals = self.arrival_model.get_arrivals()
         if self.action_type in ["limit", "limit_and_market"]:
             depths = self.limit_depths(action)
-            fills = self.fill_probability_model.get_hypothetical_fills(depths)
+            fills = self.fill_probability_model.get_fills(depths)
         else:
             fills = self.post_at_touch(action)
         self._update_agent_state(arrivals, fills, action)
@@ -164,13 +160,13 @@ class TradingEnvironment(gym.Env):
 
     def market_order_buy(self, action: np.ndarray):
         if self.action_type == "limit_and_market":
-            return action[..., 2]
+            return action[:, 2]
         else:
             raise Exception('Market order buy action only exists for action_type == "limit_and_market".')
 
     def market_order_sell(self, action: np.ndarray):
         if self.action_type == "limit_and_market":
-            return action[..., 3]
+            return action[:, 3]
         else:
             raise Exception('Market order sell action only exists for action_type == "limit_and_market".')
 
@@ -180,9 +176,18 @@ class TradingEnvironment(gym.Env):
         else:
             raise Exception('Post buy at touch action only exists for action_type == "touch".')
 
-    def _get_initial_state(self) -> np.ndarray:
-        scalar_initial_state = np.array([[self.initial_cash, self.initial_inventory, 0.0]])
+    @property
+    def initial_state(self) -> np.ndarray:
+        scalar_initial_state = np.array([[self.initial_cash, 0, 0.0]])
         initial_state = np.repeat(scalar_initial_state, self.num_trajectories, axis=0)
+        if isinstance(self.initial_inventory, tuple) and len(self.initial_inventory) == 2:
+            # initial_inventories = self.rng.normal(*self.initial_inventory, size=self.num_trajectories).round()
+            initial_inventories = self.rng.integers(*self.initial_inventory, size=self.num_trajectories)
+        elif isinstance(self.initial_inventory, int):
+            initial_inventories = self.initial_inventory * np.ones((self.num_trajectories,))
+        else:
+            raise Exception("Initial inventory must be a tuple of length 2 or an int.")
+        initial_state[:, 1] = initial_inventories
         initial_state = np.append(initial_state, self.midprice_model.initial_vector_state, axis=1)
         initial_state = np.append(initial_state, self.arrival_model.initial_vector_state, axis=1)
         initial_state = np.append(initial_state, self.fill_probability_model.initial_vector_state, axis=1)

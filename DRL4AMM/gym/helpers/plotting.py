@@ -10,27 +10,46 @@ from DRL4AMM.gym.helpers.generate_trajectory import generate_trajectory
 
 
 def plot_trajectory(env: gym.Env, agent: Agent, seed: int = None):
-    assert env.num_trajectories == 1, "Plotting a trajectory can only be done when env.num_trajectories == 1."
+    # assert env.num_trajectories == 1, "Plotting a trajectory can only be done when env.num_trajectories == 1."
     timestamps = get_timestamps(env)
     observations, actions, rewards = generate_trajectory(env, agent, seed)
-    observations = observations.reshape(-1, env.observation_space.shape[0])
-    actions = actions.reshape(-1, 2)
-    cum_rewards = np.cumsum(rewards)
-    cash_holdings = observations[:, 0]
-    inventory = observations[:, 1]
-    asset_prices = observations[:, 3]
+    cum_rewards = np.cumsum(rewards, axis=2)
+    cash_holdings = observations[:, 0, :]
+    inventory = observations[:, 1, :]
+    asset_prices = observations[:, 3, :]
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(20, 10))
+    ax3a = ax3.twinx()
     ax1.title.set_text("cum_rewards")
     ax2.title.set_text("asset_prices")
     ax3.title.set_text("inventory and cash holdings")
     ax4.title.set_text("quoted spreads")
-    ax1.plot(timestamps[1:], cum_rewards)
-    ax2.plot(timestamps, asset_prices)
-    ax3.plot(timestamps, inventory, label="inventory", color="r")
-    ax3a = ax3.twinx()
-    ax3a.plot(timestamps, cash_holdings, label="cash holdings")
-    ax4.plot(timestamps[0:-1], actions[0, :], label="bid half spread")
-    ax4.plot(timestamps[0:-1], actions[1, :], label="ask half spread")
+    for i in range(env.num_trajectories):
+        ax1.plot(timestamps[1:], cum_rewards[i, 0, :])
+        ax2.plot(timestamps, asset_prices[i, :])
+        ax3.plot(
+            timestamps, inventory[i, :], label=f"inventory {i}", color="r", alpha=(i + 1) / (env.num_trajectories + 1)
+        )
+        ax3a.plot(
+            timestamps,
+            cash_holdings[i, :],
+            label=f"cash holdings {i}",
+            color="b",
+            alpha=(i + 1) / (env.num_trajectories + 1),
+        )
+        ax4.plot(
+            timestamps[0:-1],
+            actions[i, 0, :],
+            label=f"bid half spread {i}",
+            color="r",
+            alpha=(i + 1) / (env.num_trajectories + 1),
+        )
+        ax4.plot(
+            timestamps[0:-1],
+            actions[i, 1, :],
+            label=f"ask half spread {i}",
+            color="b",
+            alpha=(i + 1) / (env.num_trajectories + 1),
+        )
     ax3.legend()
     ax4.legend()
     plt.show()

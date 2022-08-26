@@ -15,11 +15,11 @@ class RandomAgent(Agent):
         self.env.action_space.seed(seed)
 
     def get_action(self, state: np.ndarray) -> np.ndarray:
-        return np.repeat(self.env.action_space.sample().reshape(1, -1), self.env.num_trajectories, axis = 0)
+        return np.repeat(self.env.action_space.sample().reshape(1, -1), self.env.num_trajectories, axis=0)
 
 
 class FixedActionAgent(Agent):
-    def __init__(self, fixed_action: tuple, env:gym.Env):
+    def __init__(self, fixed_action: tuple, env: gym.Env):
         self.fixed_action = fixed_action
         self.env = env
 
@@ -98,12 +98,12 @@ class CarteaJaimungalAgent(Agent):
         self.num_trajectories = self.env.num_trajectories
 
     def get_action(self, state: np.ndarray):
-        action = np.zeros(shape=(self.num_trajectories,2))
-        for iq, q in enumerate(state[:,1]):
+        action = np.zeros(shape=(self.num_trajectories, 2))
+        for iq, q in enumerate(state[:, 1]):
             inventory = q
-            current_time = state[iq,2]
+            current_time = state[iq, 2]
             aux_action = np.array(self._calculate_deltas(current_time, inventory))
-            action[iq,:] = aux_action[:,0]
+            action[iq, :] = aux_action[:, 0]
         return action
 
     def _calculate_deltas(self, current_time: float, inventory: int):
@@ -136,11 +136,11 @@ class CarteaJaimungalAgent(Agent):
     def _calculate_a_and_z(self):
         matrix_size = 2 * self.max_inventory + 1
         Amatrix = np.zeros(shape=(matrix_size, matrix_size))
-        z_vector = np.zeros(shape=(matrix_size,1))
+        z_vector = np.zeros(shape=(matrix_size, 1))
         for i in range(matrix_size):
             inventory = self.max_inventory - i
             Amatrix[i, i] = -self.phi * self.kappa * inventory**2
-            z_vector[i,0] = np.exp(-self.alpha * self.kappa * inventory**2)
+            z_vector[i, 0] = np.exp(-self.alpha * self.kappa * inventory**2)
             if i + 1 < matrix_size:
                 Amatrix[i, i + 1] = self.lambdas[0] * np.exp(-1)
             if i > 0:

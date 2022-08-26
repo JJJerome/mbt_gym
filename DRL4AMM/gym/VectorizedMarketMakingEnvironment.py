@@ -8,14 +8,9 @@ from gym.spaces import Box
 from stable_baselines3.common.vec_env import VecEnv
 from stable_baselines3.common.vec_env.base_vec_env import VecEnvObs, VecEnvStepReturn, VecEnvIndices
 
-from DRL4AMM.gym.probability_models import (
-    MidpriceModel,
-    ArrivalModel,
-    FillProbabilityModel,
-    BrownianMotionMidpriceModel,
-    PoissonArrivalModel,
-    ExponentialFillFunction,
-)
+from DRL4AMM.stochastic_processes.arrival_models import ArrivalModel, PoissonArrivalModel
+from DRL4AMM.stochastic_processes.fill_probability_models import FillProbabilityModel, ExponentialFillFunction
+from DRL4AMM.stochastic_processes.midprice_models import MidpriceModel, BrownianMotionMidpriceModel
 from DRL4AMM.rewards.RewardFunctions import RewardFunction, PnL
 
 
@@ -111,7 +106,7 @@ class VectorizedMarketMakingEnvironment(VecEnv):
         arrivals = self.arrival_model.get_arrivals()
         if self.action_type in ["limit", "limit_and_market"]:
             depths = action[:, 0:2]
-            fills = self.fill_probability_model.get_hypothetical_fills(depths)
+            fills = self.fill_probability_model.get_fills(depths)
         else:
             fills = action[:, 0:2]
         self.arrival_model.update(arrivals, fills, action)  # TODO

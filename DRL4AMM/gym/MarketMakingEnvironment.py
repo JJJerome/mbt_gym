@@ -6,14 +6,9 @@ from gym.envs.registration import EnvSpec
 from gym.spaces import Box
 from math import isclose
 
-from DRL4AMM.gym.probability_models import (
-    MidpriceModel,
-    FillProbabilityModel,
-    ArrivalModel,
-    BrownianMotionMidpriceModel,
-    PoissonArrivalModel,
-    ExponentialFillFunction,
-)
+from DRL4AMM.stochastic_processes.arrival_models import ArrivalModel, PoissonArrivalModel
+from DRL4AMM.stochastic_processes.fill_probability_models import FillProbabilityModel, ExponentialFillFunction
+from DRL4AMM.stochastic_processes.midprice_models import MidpriceModel, BrownianMotionMidpriceModel
 from DRL4AMM.gym.tracking.InfoCalculator import InfoCalculator, ActionInfoCalculator
 from DRL4AMM.rewards.RewardFunctions import RewardFunction, CjCriterion, PnL
 
@@ -107,7 +102,7 @@ class MarketMakingEnvironment(gym.Env):
         arrivals = self.arrival_model.get_arrivals()
         if self.action_type in ["limit", "limit_and_market"]:
             depths = np.array([[self.limit_buy_depth(action), self.limit_sell_depth(action)]])
-            fills = self.fill_probability_model.get_hypothetical_fills(depths)
+            fills = self.fill_probability_model.get_fills(depths)
         else:
             fills = np.array([self.post_buy_at_touch(action), self.post_sell_at_touch(action)])
         self.arrival_model.update(arrivals, fills, action)  # TODO

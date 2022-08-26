@@ -92,7 +92,8 @@ class LearnTerminalStrategy(gym.Wrapper):
         self.env.reset()
         start_time = self.env.terminal_time - self.num_final_steps * self.env.dt
         start_asset_price = (
-            self.env.drift * self.env.terminal_time + self.env.volatility * sqrt(start_time) * self.env.rng.normal()
+            self.env.mean_reversion_level * self.env.terminal_time
+            + self.env.volatility * sqrt(start_time) * self.env.rng.normal()
         )
         start_cash = self.env.rng.normal(self.env.initial_cash, self.env.initial_cash / 2)
         start_inventory = self.env.rng.integers(self.env.observation_space.low[2], self.env.observation_space.high[2])

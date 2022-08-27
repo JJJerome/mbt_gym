@@ -14,6 +14,11 @@ from DRL4AMM.rewards.RewardFunctions import RewardFunction, PnL
 
 ACTION_SPACES = ["touch", "limit", "limit_and_market"]
 
+CASH_INDEX = 0
+INVENTORY_INDEX = 1
+TIME_INDEX = 2
+ASSET_PRICE_INDEX = 3
+
 
 class TradingEnvironment(gym.Env):
     metadata = {"render.modes": ["human"]}
@@ -111,9 +116,12 @@ class TradingEnvironment(gym.Env):
         self.arrival_model.update(arrivals, fills, action)
         self.midprice_model.update(arrivals, fills, action)
         self.fill_probability_model.update(arrivals, fills, action)
-        self.state[:, self.midprice_index_range[0] : self.midprice_index_range[1]] = self.midprice_model.current_state
-        self.state[:, self.arrival_index_range[0] : self.arrival_index_range[1]] = self.arrival_model.current_state
-        self.state[:, self.fill_index_range[0] : self.fill_index_range[1]] = self.fill_probability_model.current_state
+        self.state[:, self.midprice_index_range[0]: 
+                      self.midprice_index_range[1]] = self.midprice_model.current_state
+        self.state[:, self.arrival_index_range[0]: 
+                      self.arrival_index_range[1]] = self.arrival_model.current_state
+        self.state[:, self.fill_index_range[0]: 
+                      self.fill_index_range[1]] = self.fill_probability_model.current_state
 
     def _update_agent_state(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
         if self.action_type == "limit_and_market":
@@ -121,20 +129,22 @@ class TradingEnvironment(gym.Env):
             mo_sell = np.single(self.market_order_sell(action) > 0.5)
             best_bid = self.midprice - self.minimum_tick_size
             best_ask = self.midprice + self.minimum_tick_size
-            self.state[:, 0] += mo_sell * best_bid - mo_buy * best_ask
-            self.state[:, 1] += mo_buy - mo_sell
-        self.state[:, 1] += np.sum(arrivals * fills * -self.multiplier, axis=1)
+            self.state[:, CASH_INDEX] += mo_sell * best_bid - mo_buy * best_ask
+            self.state[:, INVENTORY_INDEX] += mo_buy - mo_sell
+        self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self.multiplier, axis=1)
         if self.action_type == "touch":
-            self.state[:, 0] += np.sum(
-                self.multiplier * arrivals * fills * (self.midprice + self.minimum_tick_size * self.multiplier), axis=1
+            self.state[:, CASH_INDEX] += np.sum(
+                self.multiplier * arrivals * fills *\
+                (self.midprice + self.minimum_tick_size * self.multiplier), axis=1
             )
         else:
-            self.state[:, 0] += np.sum(
-                self.multiplier * arrivals * fills * (self.midprice + self.limit_depths(action) * self.multiplier),
+            self.state[:, CASH_INDEX] += np.sum(
+                self.multiplier * arrivals * fills *\
+                (self.midprice + self.limit_depths(action) * self.multiplier),
                 axis=1,
             )
         self._clip_inventory_and_cash()
-        self.state[:, 2] += self.dt
+        self.state[:, TIME_INDEX] += self.dt
 
     @property
     def midprice(self):

@@ -37,7 +37,7 @@ class TradingEnvironment(gym.Env):
         max_cash: float = None,
         max_stock_price: float = None,
         max_depth: float = None,
-        minimum_tick_size: float = None,
+        half_spread: float = None,
         info_calculator: InfoCalculator = None,
         seed: int = None,
         num_trajectories: int = 1,
@@ -68,7 +68,7 @@ class TradingEnvironment(gym.Env):
         self.max_depth = max_depth or self.fill_probability_model.max_depth
         self.observation_space = self._get_observation_space()
         self.action_space = self._get_action_space()
-        self.minimum_tick_size = minimum_tick_size
+        self.half_spread = half_spread
         self.info_calculator = info_calculator or ActionInfoCalculator()
         self.midprice_index_range = self._get_midprice_index_range()
         self.arrival_index_range = self._get_fill_index_range()
@@ -123,14 +123,14 @@ class TradingEnvironment(gym.Env):
         if self.action_type == "limit_and_market":
             mo_buy = np.single(self.market_order_buy(action) > 0.5)
             mo_sell = np.single(self.market_order_sell(action) > 0.5)
-            best_bid = self.midprice - self.minimum_tick_size
-            best_ask = self.midprice + self.minimum_tick_size
+            best_bid = self.midprice - self.half_spread
+            best_ask = self.midprice + self.half_spread
             self.state[:, CASH_INDEX] += mo_sell * best_bid - mo_buy * best_ask
             self.state[:, INVENTORY_INDEX] += mo_buy - mo_sell
         self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self.multiplier, axis=1)
         if self.action_type == "touch":
             self.state[:, CASH_INDEX] += np.sum(
-                self.multiplier * arrivals * fills * (self.midprice + self.minimum_tick_size * self.multiplier), axis=1
+                self.multiplier * arrivals * fills * (self.midprice + self.half_spread * self.multiplier), axis=1
             )
         else:
             self.state[:, CASH_INDEX] += np.sum(

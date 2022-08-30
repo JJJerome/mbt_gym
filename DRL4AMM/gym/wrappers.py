@@ -83,14 +83,14 @@ class LearnTerminalStrategy(gym.Wrapper):
         # Call the parent constructor, so we can access self.env later
         super(LearnTerminalStrategy, self).__init__(env)
         self.num_final_steps = num_final_steps
-        env.observation_space.low[-1] = env.terminal_time - num_final_steps * env.dt
+        env.observation_space.low[-1] = env.terminal_time - num_final_steps * env.step_size
 
     def reset(self):
         """
         Reset the environment
         """
         self.env.reset()
-        start_time = self.env.terminal_time - self.num_final_steps * self.env.dt
+        start_time = self.env.terminal_time - self.num_final_steps * self.env.step_size
         start_asset_price = (
             self.env.mean_reversion_level * self.env.terminal_time
             + self.env.volatility * sqrt(start_time) * self.env.rng.normal()

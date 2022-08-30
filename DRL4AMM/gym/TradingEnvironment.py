@@ -1,4 +1,3 @@
-from copy import deepcopy
 from typing import Union, Tuple
 
 import gym
@@ -47,15 +46,16 @@ class TradingEnvironment(gym.Env):
         self.terminal_time = terminal_time
         self.num_trajectories = num_trajectories
         self.n_steps = n_steps
+        self.step_size = self.terminal_time / self.n_steps
         self.reward_function = reward_function or PnL()
         self.midprice_model: MidpriceModel = midprice_model or BrownianMotionMidpriceModel(
-            step_size=self.terminal_time / self.n_steps, num_trajectories=num_trajectories
+            step_size=self.step_size, num_trajectories=num_trajectories
         )
         self.arrival_model: ArrivalModel = arrival_model or PoissonArrivalModel(
-            step_size=self.terminal_time / self.n_steps, num_trajectories=num_trajectories
+            step_size=self.step_size, num_trajectories=num_trajectories
         )
         self.fill_probability_model: FillProbabilityModel = fill_probability_model or ExponentialFillFunction(
-            step_size=self.terminal_time / self.n_steps, num_trajectories=num_trajectories
+            step_size=self.step_size, num_trajectories=num_trajectories
         )
         self.action_type = action_type
         self.rng = np.random.default_rng(seed)
@@ -66,7 +66,6 @@ class TradingEnvironment(gym.Env):
         self.max_stock_price = max_stock_price or self.midprice_model.max_value[0, 0]
         self.max_cash = max_cash or self._get_max_cash()
         self.max_depth = max_depth or self.fill_probability_model.max_depth
-        self.dt = self.terminal_time / self.n_steps
         self.observation_space = self._get_observation_space()
         self.action_space = self._get_action_space()
         self.minimum_tick_size = minimum_tick_size
@@ -84,12 +83,12 @@ class TradingEnvironment(gym.Env):
         self.arrival_model.reset()
         self.fill_probability_model.reset()
         self.state = self.initial_state
-        return self.state
+        return self.state.copy()
 
     def step(self, action: np.ndarray):
-        current_state = deepcopy(self.state)
+        current_state = self.state.copy()
         next_state = self._update_state(action)
-        done = self.state[0, 2] >= self.terminal_time - self.dt / 2
+        done = self.state[0, 2] >= self.terminal_time - self.step_size / 2
         dones = np.full((self.num_trajectories,), done, dtype=bool)
         rewards = self.reward_function.calculate(current_state, action, next_state, done)
         infos = self.empty_infos
@@ -116,12 +115,9 @@ class TradingEnvironment(gym.Env):
         self.arrival_model.update(arrivals, fills, action)
         self.midprice_model.update(arrivals, fills, action)
         self.fill_probability_model.update(arrivals, fills, action)
-        self.state[:, self.midprice_index_range[0]: 
-                      self.midprice_index_range[1]] = self.midprice_model.current_state
-        self.state[:, self.arrival_index_range[0]: 
-                      self.arrival_index_range[1]] = self.arrival_model.current_state
-        self.state[:, self.fill_index_range[0]: 
-                      self.fill_index_range[1]] = self.fill_probability_model.current_state
+        self.state[:, self.midprice_index_range[0] : self.midprice_index_range[1]] = self.midprice_model.current_state
+        self.state[:, self.arrival_index_range[0] : self.arrival_index_range[1]] = self.arrival_model.current_state
+        self.state[:, self.fill_index_range[0] : self.fill_index_range[1]] = self.fill_probability_model.current_state
 
     def _update_agent_state(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
         if self.action_type == "limit_and_market":
@@ -134,17 +130,15 @@ class TradingEnvironment(gym.Env):
         self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self.multiplier, axis=1)
         if self.action_type == "touch":
             self.state[:, CASH_INDEX] += np.sum(
-                self.multiplier * arrivals * fills *\
-                (self.midprice + self.minimum_tick_size * self.multiplier), axis=1
+                self.multiplier * arrivals * fills * (self.midprice + self.minimum_tick_size * self.multiplier), axis=1
             )
         else:
             self.state[:, CASH_INDEX] += np.sum(
-                self.multiplier * arrivals * fills *\
-                (self.midprice + self.limit_depths(action) * self.multiplier),
+                self.multiplier * arrivals * fills * (self.midprice + self.limit_depths(action) * self.multiplier),
                 axis=1,
             )
         self._clip_inventory_and_cash()
-        self.state[:, TIME_INDEX] += self.dt
+        self.state[:, TIME_INDEX] += self.step_size
 
     @property
     def midprice(self):
@@ -269,7 +263,7 @@ class TradingEnvironment(gym.Env):
     def _check_params(self):
         assert self.action_type in ["limit", "limit_and_market", "touch"]
         for stochastic_process in [self.midprice_model, self.arrival_model, self.fill_probability_model]:
-            assert np.isclose(stochastic_process.step_size, self.terminal_time / self.n_steps, 2), (
+            assert np.isclose(stochastic_process.step_size, self.step_size, 2), (
                 f"{type(self.midprice_model).__name__}.step_size = {stochastic_process.step_size}, "
                 + f" but env.step_size = {self.terminal_time/self.n_steps}"
             )

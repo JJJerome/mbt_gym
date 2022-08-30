@@ -199,3 +199,90 @@ class BrownianMotionJumpMidpriceModel(MidpriceModel):
     def _get_max_value(self, initial_price, terminal_time):
         return initial_price + 4 * self.volatility * terminal_time
 
+
+
+class OuJumpMidpriceModel(MidpriceModel):
+    def __init__(
+        self,
+        mean_reversion_level: float = 0.0,
+        mean_reversion_speed: float = 1.0,
+        volatility: float = 2.0,
+        jump_size: float = 1.0,
+        initial_price: float = 100.0,
+        terminal_time: float = 1.0,
+        step_size: float = 0.01,
+        num_trajectories: int = 1,
+        seed: Optional[int] = None,
+    ):
+        self.mean_reversion_level = mean_reversion_level
+        self.mean_reversion_speed = mean_reversion_speed
+        self.volatility = volatility
+        self.jump_size = self.jump_size
+        self.terminal_time = terminal_time
+        super().__init__(
+            min_value=np.array([[initial_price - (self._get_max_value(initial_price, terminal_time) - initial_price)]]),
+            max_value=np.array([[self._get_max_value(initial_price, terminal_time)]]),
+            step_size=step_size,
+            terminal_time=terminal_time,
+            initial_state=np.array([[initial_price]]),
+            num_trajectories=num_trajectories,
+            seed=seed,
+        )
+
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> np.ndarray:
+        fills_bid = fills[:,0]
+        fills_ask = fills[:,1]
+        self.current_state = (
+            self.current_state -self.mean_reversion_speed * (
+            self.current_state - self.mean_reversion_level * np.ones((self.num_trajectories, 1))
+        ) + self.volatility * sqrt(self.step_size) * self.rng.normal(size=(self.num_trajectories, 1))
+        - self.jump_size * fills_bid  + self.jump_size * fills_ask
+        )
+    def _get_max_value(self, initial_price, terminal_time):
+        return initial_price + 4 * self.volatility * terminal_time  
+
+
+
+class ShortTermJumpAlphaMidpriceModel(MidpriceModel):
+    def __init__(
+        self,
+        volatility: float = 2.0,
+        ou_jump_process: OuJumpMidpriceModel = None,
+        initial_price: float = 100.0,
+        terminal_time: float = 1.0,
+        step_size: float = 0.01,
+        num_trajectories: int = 1,
+        seed: Optional[int] = None,
+    ):
+        self.volatility = volatility
+        self.ou_jump_process = ou_jump_process or OuJumpMidpriceModel(initial_price = 0.0)
+        self.terminal_time = terminal_time
+        super().__init__(
+            min_value=np.array(
+                [
+                    [
+                        initial_price - (self._get_max_asset_price(initial_price, terminal_time) - initial_price),
+                        self.ou_jump_process.min_value,
+                    ]
+                ]
+            ),
+            max_value=np.array([[self._get_max_asset_price(initial_price, terminal_time), self.ou_jump_process.max_value]]),
+            step_size=step_size,
+            terminal_time=terminal_time,
+            initial_state=np.array([[initial_price,self.ou_jump_process.initial_state[0][0]]]),
+            num_trajectories=num_trajectories,
+            seed=seed,
+        )
+
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> np.ndarray:
+        self.current_state[:, 0] = self.current_state[:, 0] + self.ou_jump_process.current_state * self.step_size * np.ones(
+            (self.num_trajectories, 1)
+        ) + self.volatility * sqrt(self.step_size) * self.rng.normal(size=(self.num_trajectories, 1))
+        self.ou_jump_process.update(arrivals, fills, actions)
+        self.current_state[:, 1] = self.ou_jump_process.current_state
+
+    def _get_max_asset_price(self, initial_price, terminal_time):
+        return initial_price + 4 * self.volatility * terminal_time  # TODO: what should this be?
+
+
+

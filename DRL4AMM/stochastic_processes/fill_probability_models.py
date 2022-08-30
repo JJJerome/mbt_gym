@@ -63,3 +63,55 @@ class ExponentialFillFunction(FillProbabilityModel):
 
     def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray):
         pass
+
+
+class TriangularFillFunction(FillProbabilityModel):
+    def __init__(
+        self, max_fill_depth: float = 1.0, step_size: float = 0.1, num_trajectories: int = 1, seed: Optional[int] = None
+    ):
+        self.max_fill_depth = max_fill_depth
+        super().__init__(
+            min_value=np.array([[]]),
+            max_value=np.array([[]]),
+            step_size=step_size,
+            terminal_time=0.0,
+            initial_state=np.array([[]]),
+            num_trajectories=num_trajectories,
+            seed=seed,
+        )
+
+    def _get_fill_probabilities(self, depths: np.ndarray) -> np.ndarray:
+        return np.max(1 - np.max(depths, 0) / self.max_fill_depth, 0)
+
+    @property
+    def max_depth(self) -> float:
+        return 1.5 * self.max_fill_depth
+
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray):
+        pass
+
+
+class PowerFillFunction(FillProbabilityModel):
+    def __init__(
+        self, fill_exponent: float = 1.5, step_size: float = 0.1, num_trajectories: int = 1, seed: Optional[int] = None
+    ):
+        self.fill_exponent = fill_exponent
+        super().__init__(
+            min_value=np.array([[]]),
+            max_value=np.array([[]]),
+            step_size=step_size,
+            terminal_time=0.0,
+            initial_state=np.array([[]]),
+            num_trajectories=num_trajectories,
+            seed=seed,
+        )
+
+    def _get_fill_probabilities(self, depths: np.ndarray) -> np.ndarray:
+        return (1 + np.max(depths, 0)) ** -self.fill_exponent
+
+    @property
+    def max_depth(self) -> float:
+        return 0.01 ** (-1 / self.fill_exponent) - 1
+
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray):
+        pass

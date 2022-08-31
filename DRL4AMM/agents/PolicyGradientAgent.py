@@ -52,11 +52,13 @@ class PolicyGradientAgent(Agent):
         return action.detach().numpy()
 
     def train(self, num_epochs: int = 1, reporting_freq: int = 100):
-        losses = []
-        actions = []
+        learning_losses = []
+        learning_rewards = []
+        learning_actions = []
         self.proportion_completed = 0.0
         for epoch in tqdm(range(num_epochs)):
-            observations, action, rewards, log_probs = generate_trajectory(self.env, self, include_log_probs=True)
+            observations, actions, rewards, log_probs = generate_trajectory(self.env, self, include_log_probs=True)
+            learning_rewards.append(rewards.sum())
             rewards = torch.tensor(rewards)
             flipped_rewards = torch.flip(rewards, dims=(-1,))
             future_flipped = torch.cumsum(flipped_rewards, dim=-1)
@@ -71,8 +73,8 @@ class PolicyGradientAgent(Agent):
                     "Action at t=0.5*T & inventory 0 is"
                     + str(self.get_action(np.array([[self.env.terminal_time, 0.5]]), deterministic=True))
                 )
-            losses.append(loss.item())
-            actions.append(self.get_action(np.array([[self.env.terminal_time, 0.5]]), deterministic=True))
+            learning_losses.append(loss.item())
+            learning_actions.append(self.get_action(np.array([[self.env.terminal_time, 0.5]]), deterministic=True))
             self.proportion_completed += 1 / (num_epochs - 1)
             self.scheduler.step()
-        return actions, losses
+        return learning_actions, learning_losses, learning_rewards

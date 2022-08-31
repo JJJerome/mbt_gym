@@ -58,7 +58,7 @@ class PolicyGradientAgent(Agent):
         self.proportion_completed = 0.0
         for epoch in tqdm(range(num_epochs)):
             observations, actions, rewards, log_probs = generate_trajectory(self.env, self, include_log_probs=True)
-            learning_rewards.append(rewards.sum())
+            learning_rewards.append(rewards.mean())
             rewards = torch.tensor(rewards)
             flipped_rewards = torch.flip(rewards, dims=(-1,))
             future_flipped = torch.cumsum(flipped_rewards, dim=-1)

@@ -58,7 +58,6 @@ class TradingEnvironment(gym.Env):
             step_size=self.step_size, num_trajectories=num_trajectories
         )
         self.action_type = action_type
-        self.rng = np.random.default_rng(seed)
         self.initial_cash = initial_cash
         self.initial_inventory = initial_inventory
         self.max_inventory = max_inventory
@@ -97,7 +96,7 @@ class TradingEnvironment(gym.Env):
     def _get_max_cash(self) -> float:
         return self.max_inventory * self.max_stock_price
 
-    # action = [bid_depth, ask_depth, MO_buy, MO_sell]
+    # The action space depends on the action_type but bids always precede asks for limit and market order actions.
     # state[0]=cash, state[1]=inventory, state[2]=time, state[3] = asset_price, and then remaining states depend on
     # the dimensionality of the arrival process, the midprice process and the fill probability process.
     def _update_state(self, action: np.ndarray) -> np.ndarray:
@@ -267,3 +266,8 @@ class TradingEnvironment(gym.Env):
                 f"{type(self.midprice_model).__name__}.step_size = {stochastic_process.step_size}, "
                 + f" but env.step_size = {self.terminal_time/self.n_steps}"
             )
+
+    def seed(self, seed:int=None):
+        self.rng = np.random.default_rng(seed)
+
+

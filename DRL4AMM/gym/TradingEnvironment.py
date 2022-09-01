@@ -8,7 +8,7 @@ from gym.spaces import Box
 from DRL4AMM.stochastic_processes.arrival_models import ArrivalModel, PoissonArrivalModel
 from DRL4AMM.stochastic_processes.fill_probability_models import FillProbabilityModel, ExponentialFillFunction
 from DRL4AMM.stochastic_processes.midprice_models import MidpriceModel, BrownianMotionMidpriceModel
-from DRL4AMM.gym.tracking.InfoCalculator import InfoCalculator, ActionInfoCalculator
+from DRL4AMM.gym.info_calculation.InfoCalculator import InfoCalculator, ActionInfoCalculator
 from DRL4AMM.rewards.RewardFunctions import RewardFunction, PnL
 
 ACTION_SPACES = ["touch", "limit", "limit_and_market"]

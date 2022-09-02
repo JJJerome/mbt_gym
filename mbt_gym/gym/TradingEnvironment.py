@@ -74,7 +74,7 @@ class TradingEnvironment(gym.Env):
         self.midprice_index_range = self._get_midprice_index_range()
         self.arrival_index_range = self._get_fill_index_range()
         self.fill_index_range = self._get_fill_index_range()
-        self.empty_infos = [{} for _ in range(self.num_trajectories)]
+        self.empty_infos = [{} for _ in range(self.num_trajectories)] if self.num_trajectories > 1 else {}
         ones = np.ones((self.num_trajectories, 1))
         self.multiplier = np.append(-ones, ones, axis=1)
 
@@ -86,6 +86,8 @@ class TradingEnvironment(gym.Env):
         return self.state.copy()
 
     def step(self, action: np.ndarray):
+        if action.shape != (self.num_trajectories, self.action_space.shape[0]):
+            action = action.reshape(self.num_trajectories, self.action_space.shape[0])
         current_state = self.state.copy()
         next_state = self._update_state(action)
         done = self.state[0, 2] >= self.terminal_time - self.step_size / 2

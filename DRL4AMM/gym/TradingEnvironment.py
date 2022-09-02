@@ -49,18 +49,19 @@ class TradingEnvironment(gym.Env):
         self.step_size = self.terminal_time / self.n_steps
         self.reward_function = reward_function or PnL()
         self.midprice_model: MidpriceModel = midprice_model or BrownianMotionMidpriceModel(
-            step_size=self.step_size, num_trajectories=num_trajectories
+            step_size=self.step_size, num_trajectories=num_trajectories, seed=seed
         )
         self.arrival_model: ArrivalModel = arrival_model or PoissonArrivalModel(
-            step_size=self.step_size, num_trajectories=num_trajectories
+            step_size=self.step_size, num_trajectories=num_trajectories, seed=seed
         )
         self.fill_probability_model: FillProbabilityModel = fill_probability_model or ExponentialFillFunction(
-            step_size=self.step_size, num_trajectories=num_trajectories
+            step_size=self.step_size, num_trajectories=num_trajectories, seed=seed
         )
         self.action_type = action_type
         self.initial_cash = initial_cash
         self.initial_inventory = initial_inventory
         self.max_inventory = max_inventory
+        self._check_params()
         self.state = self.initial_state
         self.max_stock_price = max_stock_price or self.midprice_model.max_value[0, 0]
         self.max_cash = max_cash or self._get_max_cash()
@@ -69,10 +70,10 @@ class TradingEnvironment(gym.Env):
         self.action_space = self._get_action_space()
         self.half_spread = half_spread
         self.info_calculator = info_calculator or ActionInfoCalculator()
+        self.rng = np.random.default_rng(seed)
         self.midprice_index_range = self._get_midprice_index_range()
         self.arrival_index_range = self._get_fill_index_range()
         self.fill_index_range = self._get_fill_index_range()
-        self._check_params()
         self.empty_infos = [{} for _ in range(self.num_trajectories)]
         ones = np.ones((self.num_trajectories, 1))
         self.multiplier = np.append(-ones, ones, axis=1)
@@ -184,7 +185,6 @@ class TradingEnvironment(gym.Env):
         scalar_initial_state = np.array([[self.initial_cash, 0, 0.0]])
         initial_state = np.repeat(scalar_initial_state, self.num_trajectories, axis=0)
         if isinstance(self.initial_inventory, tuple) and len(self.initial_inventory) == 2:
-            # initial_inventories = self.rng.normal(*self.initial_inventory, size=self.num_trajectories).round()
             initial_inventories = self.rng.integers(*self.initial_inventory, size=self.num_trajectories)
         elif isinstance(self.initial_inventory, int):
             initial_inventories = self.initial_inventory * np.ones((self.num_trajectories,))
@@ -266,8 +266,13 @@ class TradingEnvironment(gym.Env):
                 f"{type(self.midprice_model).__name__}.step_size = {stochastic_process.step_size}, "
                 + f" but env.step_size = {self.terminal_time/self.n_steps}"
             )
+            assert stochastic_process.num_trajectories == self.num_trajectories, (
+                "The stochastic processes given to an instance of TradingEnvironment must match the number of "
+                "trajectories specified."
+            )
 
-    def seed(self, seed:int=None):
+    def seed(self, seed: int = None):
         self.rng = np.random.default_rng(seed)
-
-
+        self.midprice_model.seed(seed)
+        self.arrival_model.seed(seed)
+        self.fill_probability_model.seed(seed)

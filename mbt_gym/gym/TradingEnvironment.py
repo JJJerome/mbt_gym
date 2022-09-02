@@ -5,11 +5,11 @@ import numpy as np
 
 from gym.spaces import Box
 
-from DRL4AMM.stochastic_processes.arrival_models import ArrivalModel, PoissonArrivalModel
-from DRL4AMM.stochastic_processes.fill_probability_models import FillProbabilityModel, ExponentialFillFunction
-from DRL4AMM.stochastic_processes.midprice_models import MidpriceModel, BrownianMotionMidpriceModel
-from DRL4AMM.gym.info_calculation.InfoCalculator import InfoCalculator, ActionInfoCalculator
-from DRL4AMM.rewards.RewardFunctions import RewardFunction, PnL
+from mbt_gym.stochastic_processes.arrival_models import ArrivalModel, PoissonArrivalModel
+from mbt_gym.stochastic_processes.fill_probability_models import FillProbabilityModel, ExponentialFillFunction
+from mbt_gym.stochastic_processes.midprice_models import MidpriceModel, BrownianMotionMidpriceModel
+from mbt_gym.gym.info_calculation.InfoCalculator import InfoCalculator, ActionInfoCalculator
+from mbt_gym.rewards.RewardFunctions import RewardFunction, PnL
 
 ACTION_SPACES = ["touch", "limit", "limit_and_market"]
 
@@ -62,6 +62,7 @@ class TradingEnvironment(gym.Env):
         self.initial_inventory = initial_inventory
         self.max_inventory = max_inventory
         self._check_params()
+        self.rng = np.random.default_rng(seed)
         self.state = self.initial_state
         self.max_stock_price = max_stock_price or self.midprice_model.max_value[0, 0]
         self.max_cash = max_cash or self._get_max_cash()
@@ -70,7 +71,6 @@ class TradingEnvironment(gym.Env):
         self.action_space = self._get_action_space()
         self.half_spread = half_spread
         self.info_calculator = info_calculator or ActionInfoCalculator()
-        self.rng = np.random.default_rng(seed)
         self.midprice_index_range = self._get_midprice_index_range()
         self.arrival_index_range = self._get_fill_index_range()
         self.fill_index_range = self._get_fill_index_range()

@@ -3,10 +3,10 @@ import numpy as np
 import warnings
 from scipy.linalg import expm
 
-from pydantic import NonNegativeFloat
+from pydantic import float
 
-from DRL4AMM.agents.Agent import Agent
-from DRL4AMM.gym.TradingEnvironment import TradingEnvironment
+from mbt_gym.agents.Agent import Agent
+from mbt_gym.gym.TradingEnvironment import TradingEnvironment
 
 
 class RandomAgent(Agent):
@@ -46,7 +46,7 @@ class HumanAgent(Agent):
 
 
 class AvellanedaStoikovAgent(Agent):
-    def __init__(self, risk_aversion: NonNegativeFloat = 0.1, env: TradingEnvironment = None):
+    def __init__(self, risk_aversion: float = 0.1, env: TradingEnvironment = None):
         self.risk_aversion = risk_aversion
         self.env = env or TradingEnvironment()
         assert isinstance(self.env, TradingEnvironment)
@@ -63,17 +63,17 @@ class AvellanedaStoikovAgent(Agent):
             warnings.warn("Avellaneda-Stoikov agent is quoting a negative spread")
         return action
 
-    def _get_price_adjustment(self, inventory: int, time: NonNegativeFloat) -> float:
+    def _get_price_adjustment(self, inventory: int, time: float) -> float:
         return inventory * self.risk_aversion * self.volatility**2 * (self.terminal_time - time)
 
-    def _get_spread(self, time: NonNegativeFloat) -> float:
+    def _get_spread(self, time: float) -> float:
         if self.risk_aversion == 0:
             return 2 / self.fill_exponent  # Limit as risk aversion -> 0
         volatility_aversion_component = self.risk_aversion * self.volatility**2 * (self.terminal_time - time)
         fill_exponent_component = 2 / self.risk_aversion * np.log(1 + self.risk_aversion / self.fill_exponent)
         return volatility_aversion_component + fill_exponent_component
 
-    def _get_action(self, inventory: int, time: NonNegativeFloat):
+    def _get_action(self, inventory: int, time: float):
         bid_half_spread = (self._get_price_adjustment(inventory, time) + self._get_spread(time) / 2).reshape(-1,1)
         ask_half_spread = (-self._get_price_adjustment(inventory, time) + self._get_spread(time) / 2).reshape(-1,1)
         return np.append(bid_half_spread, ask_half_spread, axis=1)

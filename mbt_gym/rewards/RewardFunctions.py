@@ -3,8 +3,7 @@ from typing import Union
 
 import numpy as np
 
-from pydantic import NonNegativeFloat, PositiveFloat
-from DRL4AMM.gym.models import Action
+from mbt_gym.gym.models import Action
 
 CASH_INDEX = 0
 INVENTORY_INDEX = 1
@@ -39,9 +38,9 @@ class PnL(RewardFunction):
 class InventoryAdjustedPnL(RewardFunction):
     def __init__(
         self,
-        per_step_inventory_aversion: NonNegativeFloat = 0.01,
-        terminal_inventory_aversion: NonNegativeFloat = 0.0,
-        inventory_exponent: PositiveFloat = 2.0,
+        per_step_inventory_aversion: float = 0.01,
+        terminal_inventory_aversion: float = 0.0,
+        inventory_exponent: float = 2.0,
         step_size: float = 1.0 / 200,
     ):
         self.per_step_inventory_aversion = per_step_inventory_aversion
@@ -69,7 +68,7 @@ CjCriterion = InventoryAdjustedPnL
 
 
 class TerminalExponentialUtility(RewardFunction):
-    def __init__(self, risk_aversion: NonNegativeFloat = 0.1):
+    def __init__(self, risk_aversion: float = 0.1):
         self.risk_aversion = risk_aversion
 
     def calculate(

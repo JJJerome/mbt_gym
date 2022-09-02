@@ -5,7 +5,7 @@ import numpy as np
 from stable_baselines3.common.vec_env import VecEnv
 from stable_baselines3.common.vec_env.base_vec_env import VecEnvObs, VecEnvStepReturn, VecEnvIndices
 
-from DRL4AMM.gym.TradingEnvironment import TradingEnvironment
+from mbt_gym.gym.TradingEnvironment import TradingEnvironment
 
 
 class StableBaselinesTradingEnvironment(VecEnv):

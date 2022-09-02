@@ -2,7 +2,7 @@ import gym
 import numpy as np
 import torch
 
-from DRL4AMM.agents.Agent import Agent
+from mbt_gym.agents.Agent import Agent
 
 
 def generate_trajectory(env: gym.Env, agent: Agent, seed: int = None, include_log_probs: bool = False):

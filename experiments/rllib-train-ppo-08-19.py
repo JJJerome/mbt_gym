@@ -11,18 +11,18 @@ from ray.rllib.policy import Policy
 from ray.rllib.evaluation import MultiAgentEpisode, RolloutWorker
 from ray.rllib.algorithms.callbacks import DefaultCallbacks
 
-# Add DRL4AMM to path so that we can import it
+# Add mbt_gym to path so that we can import it
 import sys
-sys.path.append("/LOCAL2/jjerome/GitHub/DRL4AMM/")
+sys.path.append("/LOCAL2/jjerome/GitHub/mbt_gym/")
 
-# Set the PYTHONPATH so that the workers are all aware of DRL4AMM
+# Set the PYTHONPATH so that the workers are all aware of mbt_gym
 import os
-os.environ["PYTHONPATH"] = "/LOCAL2/jjerome/GitHub/DRL4AMM/"
+os.environ["PYTHONPATH"] = "/LOCAL2/jjerome/GitHub/mbt_gym/"
 
-from DRL4AMM.gym.MarketMakingEnvironment import MarketMakingEnvironment
-from DRL4AMM.gym.wrappers import ReduceStateSizeWrapper
-from DRL4AMM.rewards.RewardFunctions import PnL
-from DRL4AMM.gym.probability_models import *
+from mbt_gym.gym.MarketMakingEnvironment import MarketMakingEnvironment
+from mbt_gym.gym.wrappers import ReduceStateSizeWrapper
+from mbt_gym.rewards.RewardFunctions import PnL
+from mbt_gym.gym.probability_models import *
 
 import multiprocessing
 num_cpus = multiprocessing.cpu_count()
@@ -115,7 +115,7 @@ analysis = tune.run(
     mode = "max",
     reuse_actors=True,
     keep_checkpoints_num=3,
-    restore="/home/staffi/ecco/jjerome/Documents/notebooks/DRL4AMM/rllib-approach/tensorboard/ppo-for-pnl/PPO_AsEnv-v0_a9544_00000_0_2022-08-18_16-16-00/checkpoint_000099/checkpoint-99"
+    restore="/home/staffi/ecco/jjerome/Documents/notebooks/mbt_gym/rllib-approach/tensorboard/ppo-for-pnl/PPO_AsEnv-v0_a9544_00000_0_2022-08-18_16-16-00/checkpoint_000099/checkpoint-99"
 )
 
 

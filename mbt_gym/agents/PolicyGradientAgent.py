@@ -6,9 +6,9 @@ import torch
 from torch.optim.lr_scheduler import StepLR, _LRScheduler
 from tqdm import tqdm
 
-from DRL4AMM.agents.Agent import Agent
-from DRL4AMM.gym.TradingEnvironment import TradingEnvironment
-from DRL4AMM.gym.helpers.generate_trajectory import generate_trajectory
+from mbt_gym.agents.Agent import Agent
+from mbt_gym.gym.TradingEnvironment import TradingEnvironment
+from mbt_gym.gym.helpers.generate_trajectory import generate_trajectory
 
 
 class PolicyGradientAgent(Agent):

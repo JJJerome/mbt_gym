@@ -7,9 +7,9 @@ import sys
 
 sys.path.append("../../")
 
-from DRL4AMM.gym.AvellanedaStoikovEnvironment import AvellanedaStoikovEnvironment  # noqa: E402
-from DRL4AMM.gym.wrappers import ReduceStateSizeWrapper  # noqa: E402
-from DRL4AMM.rewards.RewardFunctions import InventoryAdjustedPnL  # noqa: E402
+from mbt_gym.gym.AvellanedaStoikovEnvironment import AvellanedaStoikovEnvironment  # noqa: E402
+from mbt_gym.gym.wrappers import ReduceStateSizeWrapper  # noqa: E402
+from mbt_gym.rewards.RewardFunctions import InventoryAdjustedPnL  # noqa: E402
 
 save_dir = "../../../../experiment-results/"
 

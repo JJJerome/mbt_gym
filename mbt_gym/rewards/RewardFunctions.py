@@ -3,8 +3,6 @@ from typing import Union
 
 import numpy as np
 
-from mbt_gym.gym.models import Action
-
 CASH_INDEX = 0
 INVENTORY_INDEX = 1
 TIME_INDEX = 2
@@ -72,7 +70,7 @@ class TerminalExponentialUtility(RewardFunction):
         self.risk_aversion = risk_aversion
 
     def calculate(
-        self, current_state: np.ndarray, action: Action, next_state: np.ndarray, is_terminal_step: bool = False
+        self, current_state: np.ndarray, action: np.ndarray, next_state: np.ndarray, is_terminal_step: bool = False
     ) -> float:
         return (
             -np.exp(

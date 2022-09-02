@@ -72,3 +72,4 @@ callback = EvalCallback(**callback_params)
 model = PPO(**PPO_params, device="cuda")
 
 model.learn(total_timesteps = 200_000_000)
+model.save("trained_model")

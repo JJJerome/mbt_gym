@@ -21,7 +21,10 @@ class StableBaselinesTradingEnvironment(VecEnv):
         self.actions = actions
 
     def step_wait(self) -> VecEnvStepReturn:
-        return self.env.step(self.actions)
+        state, rewards, dones, infos = self.env.step(self.actions)
+        if dones.min():
+            state = self.env.reset()  # StableBaselines VecEnvs need to automatically reset themselves.
+        return state, rewards, dones, infos
 
     def close(self) -> None:
         pass

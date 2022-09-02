@@ -3,8 +3,6 @@ import numpy as np
 import warnings
 from scipy.linalg import expm
 
-from pydantic import float
-
 from mbt_gym.agents.Agent import Agent
 from mbt_gym.gym.TradingEnvironment import TradingEnvironment
 
@@ -74,8 +72,8 @@ class AvellanedaStoikovAgent(Agent):
         return volatility_aversion_component + fill_exponent_component
 
     def _get_action(self, inventory: int, time: float):
-        bid_half_spread = (self._get_price_adjustment(inventory, time) + self._get_spread(time) / 2).reshape(-1,1)
-        ask_half_spread = (-self._get_price_adjustment(inventory, time) + self._get_spread(time) / 2).reshape(-1,1)
+        bid_half_spread = (self._get_price_adjustment(inventory, time) + self._get_spread(time) / 2).reshape(-1, 1)
+        ask_half_spread = (-self._get_price_adjustment(inventory, time) + self._get_spread(time) / 2).reshape(-1, 1)
         return np.append(bid_half_spread, ask_half_spread, axis=1)
 
 

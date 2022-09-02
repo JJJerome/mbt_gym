@@ -28,12 +28,14 @@ class FixedActionAgent(Agent):
 
 
 class FixedSpreadAgent(Agent):
-    def __init__(self, half_spread: float = 1.0, offset: float = 0.0):
+    def __init__(self, half_spread: float = 1.0, offset: float = 0.0, env: gym.Env = TradingEnvironment()):
         self.half_spread = half_spread
         self.offset = offset
+        self.env = env
 
     def get_action(self, state: np.ndarray) -> np.ndarray:
-        return np.array([self.half_spread - self.offset, self.half_spread + self.offset])
+        action = np.array([[self.half_spread - self.offset, self.half_spread + self.offset]])
+        return np.repeat(action, self.env.num_trajectories, axis=0)
 
 
 class HumanAgent(Agent):
@@ -54,10 +56,10 @@ class AvellanedaStoikovAgent(Agent):
         self.fill_exponent = self.env.fill_probability_model.fill_exponent
 
     def get_action(self, state: np.ndarray):
-        inventory = state[1]
-        time = state[2]
+        inventory = state[:, 1]
+        time = state[:, 2]
         action = self._get_action(inventory, time)
-        if min(action) < 0:
+        if action.min() < 0:
             warnings.warn("Avellaneda-Stoikov agent is quoting a negative spread")
         return action
 
@@ -72,9 +74,9 @@ class AvellanedaStoikovAgent(Agent):
         return volatility_aversion_component + fill_exponent_component
 
     def _get_action(self, inventory: int, time: NonNegativeFloat):
-        bid_half_spread = self._get_price_adjustment(inventory, time) + self._get_spread(time) / 2
-        ask_half_spread = -self._get_price_adjustment(inventory, time) + self._get_spread(time) / 2
-        return np.array([bid_half_spread, ask_half_spread])
+        bid_half_spread = (self._get_price_adjustment(inventory, time) + self._get_spread(time) / 2).reshape(-1,1)
+        ask_half_spread = (-self._get_price_adjustment(inventory, time) + self._get_spread(time) / 2).reshape(-1,1)
+        return np.append(bid_half_spread, ask_half_spread, axis=1)
 
 
 class CarteaJaimungalAgent(Agent):

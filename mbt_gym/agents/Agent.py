@@ -2,8 +2,6 @@ import abc
 
 import numpy as np
 
-from DRL4AMM.gym.models import Action
-
 
 class Agent(metaclass=abc.ABCMeta):
     @abc.abstractmethod

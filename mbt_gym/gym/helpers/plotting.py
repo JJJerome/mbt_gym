@@ -5,8 +5,9 @@ import pandas as pd
 
 import seaborn as sns
 
-from DRL4AMM.agents.Agent import Agent
-from DRL4AMM.gym.helpers.generate_trajectory import generate_trajectory
+from mbt_gym.agents.Agent import Agent
+from mbt_gym.gym.TradingEnvironment import TradingEnvironment
+from mbt_gym.gym.helpers.generate_trajectory import generate_trajectory
 
 
 def plot_trajectory(env: gym.Env, agent: Agent, seed: int = None):
@@ -87,29 +88,23 @@ def plot_pnl(rewards, symmetric_rewards=None):
     return fig
 
 
-def generate_results_table_and_hist(env: gym.Env, agent: Agent, n_episodes: int = 1000):
-    half_spreads = []
-    total_as_rewards = []
-    as_terminal_inventories = []
-    for _ in range(n_episodes):
-        observations, actions, rewards = generate_trajectory(env, agent)
-        total_as_rewards.append(sum(rewards))
-        as_terminal_inventories.append(observations[-1][2])
-        half_spread = np.array(actions).mean()
-        half_spreads.append(half_spread)
+def generate_results_table_and_hist(vec_env: TradingEnvironment, agent: Agent, n_episodes: int = 1000):
+    assert vec_env.num_trajectories > 1, "To generate a results table and hist, vec_env must roll out > 1 trajectory."
+    observations, actions, rewards = generate_trajectory(vec_env, agent)
+    total_rewards = rewards.sum(axis=-1).reshape(-1)
+    terminal_inventories = observations[:, 1, -1]
+    half_spreads = actions.mean(axis=(-1, -2))
 
     rows = ["Inventory"]
     columns = ["Mean spread", "Mean PnL", "Std PnL", "Mean terminal inventory", "Std terminal inventory"]
     results = pd.DataFrame(index=rows, columns=columns)
     results.loc[:, "Mean spread"] = 2 * np.mean(half_spreads)
-    results.loc["Inventory", "Mean PnL"] = np.mean(total_as_rewards)
-    results.loc["Inventory", "Std PnL"] = np.std(total_as_rewards)
-    results.loc["Inventory", "Mean terminal inventory"] = np.mean(as_terminal_inventories)
-    results.loc["Inventory", "Std terminal inventory"] = np.std(as_terminal_inventories)
-
-    fig = plot_pnl(total_as_rewards)
-
-    return results, fig, total_as_rewards
+    results.loc["Inventory", "Mean PnL"] = np.mean(total_rewards)
+    results.loc["Inventory", "Std PnL"] = np.std(total_rewards)
+    results.loc["Inventory", "Mean terminal inventory"] = np.mean(terminal_inventories)
+    results.loc["Inventory", "Std terminal inventory"] = np.std(terminal_inventories)
+    fig = plot_pnl(total_rewards)
+    return results, fig, total_rewards
 
 
 def get_timestamps(env):

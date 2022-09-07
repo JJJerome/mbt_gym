@@ -1,10 +1,10 @@
 import sys
 
-sys.path.append("/LOCAL2/jjerome/GitHub/DRL4AMM/")  # Location on rahul-n
+sys.path.append("/LOCAL2/jjerome/GitHub/mbt_gym/")  # Location on rahul-n
 import os
 
-os.environ["PYTHONPATH"] = "/LOCAL2/jjerome/GitHub/DRL4AMM/"  # Location on rahul-n
-# Note that we need to set the PYTHONPATH so that the workers are all aware of DRL4AMM
+os.environ["PYTHONPATH"] = "/LOCAL2/jjerome/GitHub/mbt_gym/"  # Location on rahul-n
+# Note that we need to set the PYTHONPATH so that the workers are all aware of mbt_gym
 import ray
 from ray import tune
 from ray.tune.registry import register_env
@@ -13,9 +13,9 @@ from ray.rllib.agents.ppo import DEFAULT_CONFIG
 from ray.tune.schedulers import ASHAScheduler
 
 
-from DRL4AMM.gym.AvellanedaStoikovEnvironment import AvellanedaStoikovEnvironment
-from DRL4AMM.gym.wrappers import ReduceStateSizeWrapper
-from DRL4AMM.rewards.RewardFunctions import PnL
+from mbt_gym.gym.AvellanedaStoikovEnvironment import AvellanedaStoikovEnvironment
+from mbt_gym.gym.wrappers import ReduceStateSizeWrapper
+from mbt_gym.rewards.RewardFunctions import PnL
 
 num_workers = 10
 info = ray.init(

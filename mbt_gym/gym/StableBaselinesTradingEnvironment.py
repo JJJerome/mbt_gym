@@ -5,14 +5,14 @@ import numpy as np
 from stable_baselines3.common.vec_env import VecEnv
 from stable_baselines3.common.vec_env.base_vec_env import VecEnvObs, VecEnvStepReturn, VecEnvIndices
 
-from DRL4AMM.gym.MarketMakingEnvironment import MarketMakingEnvironment
+from mbt_gym.gym.TradingEnvironment import TradingEnvironment
 
 
-class VectorizedMarketMakingEnvironmentSB(VecEnv):
-    def __init__(self, market_making_env: MarketMakingEnvironment):
-        self.env = market_making_env
+class StableBaselinesTradingEnvironment(VecEnv):
+    def __init__(self, trading_env: TradingEnvironment):
+        self.env = trading_env
         self.actions: np.ndarray = self.env.action_space.sample()
-        super().__init__(self.env.num_trajectories, self.env._get_observation_space(), self.env._get_action_space())
+        super().__init__(self.env.num_trajectories, self.env.observation_space, self.env.action_space)
 
     def reset(self) -> VecEnvObs:
         return self.env.reset()
@@ -21,7 +21,10 @@ class VectorizedMarketMakingEnvironmentSB(VecEnv):
         self.actions = actions
 
     def step_wait(self) -> VecEnvStepReturn:
-        return self.env.step(self.actions)
+        state, rewards, dones, infos = self.env.step(self.actions)
+        if dones.min():
+            state = self.env.reset()  # StableBaselines VecEnvs need to automatically reset themselves.
+        return state, rewards, dones, infos
 
     def close(self) -> None:
         pass

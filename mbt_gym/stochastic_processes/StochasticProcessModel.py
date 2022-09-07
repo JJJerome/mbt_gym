@@ -34,6 +34,9 @@ class StochasticProcessModel(metaclass=abc.ABCMeta):
     def update(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
         pass
 
+    def seed(self, seed: int = None):
+        self.rng = default_rng(seed)
+
     def _check_attribute_shapes(self):
         for name in ["initial_state", "min_value", "max_value"]:
             attribute = getattr(self, name)

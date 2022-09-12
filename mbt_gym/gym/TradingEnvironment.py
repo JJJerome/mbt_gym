@@ -264,7 +264,7 @@ class TradingEnvironment(gym.Env):
     def _check_params(self):
         assert self.action_type in ["limit", "limit_and_market", "touch"]
         for stochastic_process in [self.midprice_model, self.arrival_model, self.fill_probability_model]:
-            assert np.isclose(stochastic_process.step_size, self.step_size, 2), (
+            assert np.isclose(stochastic_process.step_size, self.step_size, atol=0.0, rtol=0.01), (
                 f"{type(self.midprice_model).__name__}.step_size = {stochastic_process.step_size}, "
                 + f" but env.step_size = {self.terminal_time/self.n_steps}"
             )

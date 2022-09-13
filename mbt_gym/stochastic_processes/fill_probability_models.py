@@ -93,9 +93,10 @@ class TriangularFillFunction(FillProbabilityModel):
 
 class PowerFillFunction(FillProbabilityModel):
     def __init__(
-        self, fill_exponent: float = 1.5, step_size: float = 0.1, num_trajectories: int = 1, seed: Optional[int] = None
+        self, fill_exponent: float = 1.5, fill_multiplier: float = 1.5, step_size: float = 0.1, num_trajectories: int = 1, seed: Optional[int] = None
     ):
         self.fill_exponent = fill_exponent
+        self.fill_multiplier = fill_multiplier
         super().__init__(
             min_value=np.array([[]]),
             max_value=np.array([[]]),
@@ -107,7 +108,7 @@ class PowerFillFunction(FillProbabilityModel):
         )
 
     def _get_fill_probabilities(self, depths: np.ndarray) -> np.ndarray:
-        return (1 + np.max(depths, 0)) ** -self.fill_exponent
+        return (1 + (self.fill_multiplier*np.max(depths, 0)) ** self.fill_exponent )**-1
 
     @property
     def max_depth(self) -> float:

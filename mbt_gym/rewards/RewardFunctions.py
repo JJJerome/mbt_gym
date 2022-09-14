@@ -33,7 +33,7 @@ class PnL(RewardFunction):
         return next_market_value - current_market_value
 
 
-class InventoryAdjustedPnL(RewardFunction):
+class RunningInventoryPenalty(RewardFunction):
     def __init__(
         self,
         per_step_inventory_aversion: float = 0.01,
@@ -62,10 +62,10 @@ class InventoryAdjustedPnL(RewardFunction):
 
 # Cartea and Jaimungal criterion is the same as inventory adjusted PnL
 
-CjCriterion = InventoryAdjustedPnL
+CjCriterion = RunningInventoryPenalty
 
 
-class TerminalExponentialUtility(RewardFunction):
+class ExponentialUtility(RewardFunction):
     def __init__(self, risk_aversion: float = 0.1):
         self.risk_aversion = risk_aversion
 

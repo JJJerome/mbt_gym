@@ -2,7 +2,7 @@ from unittest import TestCase, main
 
 import numpy as np
 
-from mbt_gym.rewards.RewardFunctions import InventoryAdjustedPnL, PnL
+from mbt_gym.rewards.RewardFunctions import RunningInventoryPenalty, PnL
 
 STEP_SIZE = 0.1
 TEST_CURRENT_STATE = np.array([100, 120, 2, 0.5])
@@ -26,7 +26,7 @@ TERMINAL_INVENTORY_AVERSION = 10
 
 class TestInventoryReward(TestCase):
     def test_calculate_per_step_reward(self):
-        reward_function = InventoryAdjustedPnL(
+        reward_function = RunningInventoryPenalty(
             PER_STEP_INVENTORY_AVERSION, TERMINAL_INVENTORY_AVERSION, step_size=STEP_SIZE
         )
         pnl = PnL().calculate(current_state=TEST_CURRENT_STATE, action=TEST_ACTION, next_state=TEST_NEXT_STATE)

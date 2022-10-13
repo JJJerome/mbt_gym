@@ -25,12 +25,17 @@ class PriceImpactModel(StochasticProcessModel):
     def get_impact(self, action: np.ndarray) -> np.ndarray:
         pass
 
+    @property
+    @abc.abstractmethod
+    def max_speed(self) -> float:
+        pass
+
 
 class TemporaryPowerPriceImpact(PriceImpactModel):
     def __init__(
         self,
-        temporary_impact_coefficient: float = 1.0,
-        temporary_impact_exponent: float = 0.01,
+        temporary_impact_coefficient: float = 0.01,
+        temporary_impact_exponent: float = 1.0,
         num_trajectories: int = 1,
     ):
         self.temporary_impact_coefficient = temporary_impact_coefficient
@@ -50,3 +55,7 @@ class TemporaryPowerPriceImpact(PriceImpactModel):
 
     def get_impact(self, action) -> np.ndarray:
         return self.temporary_impact_coefficient * action**self.temporary_impact_exponent
+
+    @property
+    def max_speed(self) -> float:
+        return 100. # TODO: link to asset price perhaps?

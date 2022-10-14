@@ -54,12 +54,12 @@ class TradingEnvironment(gym.Env):
         self.n_steps = n_steps
         self.step_size = self.terminal_time / self.n_steps
         self.reward_function = reward_function or PnL()
-        self.midprice_model = midprice_model or BrownianMotionMidpriceModel(step_size=self.step_size)
+        self.midprice_model = midprice_model or BrownianMotionMidpriceModel(step_size=self.step_size, num_trajectories=num_trajectories, seed=seed)
         self.arrival_model = arrival_model
         self.fill_probability_model = fill_probability_model
         self.price_impact_model = price_impact_model 
         self.stochastic_processes = self._get_stochastic_processes()
-        self.stochastic_processes_indices = self._get_stochastic_processes_indices()
+        self.stochastic_process_indices = self._get_stochastic_process_indices()
         self.action_type = action_type
         self.initial_cash = initial_cash
         self.initial_inventory = initial_inventory
@@ -85,12 +85,9 @@ class TradingEnvironment(gym.Env):
         for process in [self.midprice_model, self.arrival_model, self.fill_probability_model, self.price_impact_model]:
             if process is not None and process.initial_vector_state.shape[1]>0:
                 stochastic_processes.append(process)
-            if process is not None and not isinstance(process, StochasticProcessModel):
-                print("weird, process =", process)
-                #raise Exception("Stochastic process must be an instance of StochasticProcessModel")
         return stochastic_processes
 
-    def _get_stochastic_processes_indices(self):
+    def _get_stochastic_process_indices(self):
         number_of_processes = len(self.stochastic_processes)
         indices = np.zeros((number_of_processes, 2))
         count = 3
@@ -98,7 +95,7 @@ class TradingEnvironment(gym.Env):
             indices[i, 0] = count
             dimension = process.initial_vector_state.shape[1]
             indices[i, 1] = count + dimension
-            count += dimension + 1*(dimension>0)
+            count += dimension + 1
         return indices.astype(int)
 
     def reset(self):
@@ -122,10 +119,16 @@ class TradingEnvironment(gym.Env):
         return self.max_inventory * self.max_stock_price
 
     def _get_max_depth(self) -> float:
-        return 4.0  # TODO: improve
+        if self.fill_probability_model is not None:
+            return self.fill_probability_model.max_depth
+        else:
+            return 1.0
 
     def _get_max_speed(self) -> float:
-        return 100.0  # TODO: improve
+        if self.price_impact_model is not None:
+            return self.price_impact_model.max_speed
+        else:
+            return 100.0  # TODO: improve
 
     def _get_arrivals_and_fills(self, action: np.ndarray) -> np.ndarray:
         arrivals = self.arrival_model.get_arrivals()
@@ -164,13 +167,13 @@ class TradingEnvironment(gym.Env):
             best_ask = self.midprice + self.half_spread
             self.state[:, CASH_INDEX] += mo_sell * best_bid - mo_buy * best_ask
             self.state[:, INVENTORY_INDEX] += mo_buy - mo_sell
-        if self.action_type in MARKET_MAKING_ACTION_TYPES:
-            self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self.multiplier, axis=1)
         if self.action_type == "touch":
             self.state[:, CASH_INDEX] += np.sum(
                 self.multiplier * arrivals * fills * (self.midprice + self.half_spread * self.multiplier), axis=1
             )
+            self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self.multiplier, axis=1)
         elif self.action_type in MARKET_MAKING_ACTION_TYPES:
+            self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self.multiplier, axis=1)
             self.state[:, CASH_INDEX] += np.sum(
                 self.multiplier * arrivals * fills * (self.midprice + self.limit_depths(action) * self.multiplier),
                 axis=1,
@@ -239,12 +242,6 @@ class TradingEnvironment(gym.Env):
             initial_state = np.append(initial_state, process.initial_vector_state, axis=1)
         return initial_state
 
-    def _get_current_state(self) -> np.ndarray:
-        state = self.state[:, 0:3]
-        for process in self.stochastic_processes:
-            state = np.append(state, process.current_state, axis=1)
-        return state
-
     def _get_observation_space(self) -> gym.spaces.Space:
         """The observation space consists of a numpy array containg the agent's cash, the agent's inventory and the
         current time. It also contains the states of the arrival model, the midprice model and the fill probability
@@ -275,7 +272,7 @@ class TradingEnvironment(gym.Env):
                 shape=(2,),
             )
         if self.action_type == "speed":
-            return gym.spaces.Box(low=0.0, high=self.max_speed, shape=(1,))  # agent chooses speed of trading: positive buys, negative sells
+            return gym.spaces.Box(low=-self.max_speed, high=self.max_speed, shape=(1,))  # agent chooses speed of trading: positive buys, negative sells
 
 
 
@@ -284,7 +281,7 @@ class TradingEnvironment(gym.Env):
         return max(min(probability, 1), 0)
 
     def _check_params(self):
-        assert self.action_type in ["limit", "limit_and_market", "touch", "speed"]
+        assert self.action_type in ACTION_TYPES
         for stochastic_process in self.stochastic_processes:
             assert np.isclose(stochastic_process.step_size, self.step_size, atol=0.0, rtol=0.01), (
                 f"{type(self.midprice_model).__name__}.step_size = {stochastic_process.step_size}, "

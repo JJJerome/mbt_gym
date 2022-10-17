@@ -122,13 +122,13 @@ class TradingEnvironment(gym.Env):
         if self.fill_probability_model is not None:
             return self.fill_probability_model.max_depth
         else:
-            return 1.0
+            return None
 
     def _get_max_speed(self) -> float:
         if self.price_impact_model is not None:
             return self.price_impact_model.max_speed
         else:
-            return 100.0  # TODO: improve
+            return None
 
     def _get_arrivals_and_fills(self, action: np.ndarray) -> np.ndarray:
         arrivals = self.arrival_model.get_arrivals()
@@ -154,8 +154,8 @@ class TradingEnvironment(gym.Env):
     def _update_market_state(self, arrivals, fills, action):
         for i, process in enumerate(self.stochastic_processes):
             process.update(arrivals, fills, action)
-            lower_index = self.stochastic_processes_indices[i, 0]
-            upper_index = self.stochastic_processes_indices[i, 1]
+            lower_index = self.stochastic_process_indices[i, 0]
+            upper_index = self.stochastic_process_indices[i, 1]
             self.state[:, lower_index : upper_index] = process.current_state    
   
 

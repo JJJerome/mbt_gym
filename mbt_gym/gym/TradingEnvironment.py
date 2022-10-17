@@ -1,7 +1,6 @@
 from typing import Union, Tuple
 
 import gym
-from mbt_gym.stochastic_processes.StochasticProcessModel import StochasticProcessModel
 import numpy as np
 
 from gym.spaces import Box

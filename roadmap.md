@@ -15,4 +15,5 @@ process. For example, the Heston or CEV model.
 ## Optimal execution
 
 - More general price impact processes. 
+- Optimal execution with multiple assets
 

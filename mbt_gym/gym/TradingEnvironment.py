@@ -87,7 +87,7 @@ class TradingEnvironment(gym.Env):
         stochastic_processes = dict()
         for process_name in ["midprice_model", "arrival_model", "fill_probability_model", "price_impact_model"]:
             process: StochasticProcessModel = getattr(self, process_name)
-            if process is not None and process.initial_vector_state.shape[1] > 0:
+            if process is not None:
                 stochastic_processes[process_name] = process
         return OrderedDict(stochastic_processes)
 
@@ -97,7 +97,7 @@ class TradingEnvironment(gym.Env):
         for process_name, process in self.stochastic_processes.items():
             dimension = int(process.initial_vector_state.shape[1])
             process_indices[process_name] = (count, count + dimension)
-            count += dimension + 1
+            count += dimension + (dimension > 0)
         return OrderedDict(process_indices)
 
     def reset(self):
@@ -284,7 +284,7 @@ class TradingEnvironment(gym.Env):
         return max(min(probability, 1), 0)
 
     def _check_stochastic_processes(self) -> None:
-        assert self.action_type in ACTION_TYPES, f"Action type {self.action_type} is not in {ACTION_TYPES}."
+        assert self.action_type in ACTION_TYPES, f"Action type '{self.action_type}' is not in {ACTION_TYPES}."
         if self.action_type == "touch":
             processes = ["arrival_model"]
         elif self.action_type in ["limit", "limit_and_market"]:
@@ -297,7 +297,7 @@ class TradingEnvironment(gym.Env):
             self._check_process_is_not_none(process)
 
     def _check_process_is_not_none(self, process: str):
-        assert getattr(self, process) is not None, f"Action type is {self.action_type} but env.{process} is None."
+        assert getattr(self, process) is not None, f"Action type is '{self.action_type}' but env.{process} is None."
 
     def _check_params(self):
         assert self.action_type in ACTION_TYPES

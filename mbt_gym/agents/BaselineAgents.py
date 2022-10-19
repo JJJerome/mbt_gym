@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import gym
 import numpy as np
 import warnings
@@ -9,11 +11,12 @@ from mbt_gym.gym.TradingEnvironment import TradingEnvironment
 
 class RandomAgent(Agent):
     def __init__(self, env: gym.Env, seed: int = None):
-        self.env = env
-        self.env.action_space.seed(seed)
+        self.action_space = deepcopy(env.action_space)
+        self.action_space.seed(seed)
+        self.num_trajectories = env.num_trajectories
 
     def get_action(self, state: np.ndarray) -> np.ndarray:
-        return np.repeat(self.env.action_space.sample().reshape(1, -1), self.env.num_trajectories, axis=0)
+        return np.repeat(self.action_space.sample().reshape(1, -1), self.num_trajectories, axis=0)
 
 
 class FixedActionAgent(Agent):

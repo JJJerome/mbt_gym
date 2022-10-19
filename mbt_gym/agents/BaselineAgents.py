@@ -26,7 +26,7 @@ class FixedActionAgent(Agent):
 
 
 class FixedSpreadAgent(Agent):
-    def __init__(self, half_spread: float = 1.0, offset: float = 0.0, env: gym.Env = TradingEnvironment()):
+    def __init__(self, env: gym.Env, half_spread: float = 1.0, offset: float = 0.0):
         self.half_spread = half_spread
         self.offset = offset
         self.env = env

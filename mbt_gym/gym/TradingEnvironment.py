@@ -47,16 +47,18 @@ class TradingEnvironment(gym.Env):
         seed: int = None,
         num_trajectories: int = 1,
     ):
-        super().__init__() #TradingEnvironment, self
+        super().__init__()  # TradingEnvironment, self
         self.terminal_time = terminal_time
         self.num_trajectories = num_trajectories
         self.n_steps = n_steps
         self.step_size = self.terminal_time / self.n_steps
         self.reward_function = reward_function or PnL()
-        self.midprice_model = midprice_model or BrownianMotionMidpriceModel(step_size=self.step_size, num_trajectories=num_trajectories, seed=seed)
+        self.midprice_model = midprice_model or BrownianMotionMidpriceModel(
+            step_size=self.step_size, num_trajectories=num_trajectories, seed=seed
+        )
         self.arrival_model = arrival_model
         self.fill_probability_model = fill_probability_model
-        self.price_impact_model = price_impact_model 
+        self.price_impact_model = price_impact_model
         self.stochastic_processes = self._get_stochastic_processes()
         self.stochastic_process_indices = self._get_stochastic_process_indices()
         self.action_type = action_type
@@ -68,8 +70,8 @@ class TradingEnvironment(gym.Env):
         self.state = self.initial_state
         self.max_stock_price = max_stock_price or self.midprice_model.max_value[0, 0]
         self.max_cash = max_cash or self._get_max_cash()
-        self.max_depth = max_depth or self._get_max_depth() 
-        self.max_speed = max_speed or self._get_max_speed() 
+        self.max_depth = max_depth or self._get_max_depth()
+        self.max_speed = max_speed or self._get_max_speed()
         self.observation_space = self._get_observation_space()
         self.action_space = self._get_action_space()
         self.half_spread = half_spread
@@ -77,12 +79,12 @@ class TradingEnvironment(gym.Env):
         self.empty_infos = [{} for _ in range(self.num_trajectories)] if self.num_trajectories > 1 else {}
         ones = np.ones((self.num_trajectories, 1))
         self.multiplier = np.append(-ones, ones, axis=1)
-        #self._check_stochastic_processes # TODO: Implement
+        # self._check_stochastic_processes # TODO: Implement!
 
     def _get_stochastic_processes(self):
         stochastic_processes = []
         for process in [self.midprice_model, self.arrival_model, self.fill_probability_model, self.price_impact_model]:
-            if process is not None and process.initial_vector_state.shape[1]>0:
+            if process is not None and process.initial_vector_state.shape[1] > 0:
                 stochastic_processes.append(process)
         return stochastic_processes
 
@@ -155,8 +157,7 @@ class TradingEnvironment(gym.Env):
             process.update(arrivals, fills, action)
             lower_index = self.stochastic_process_indices[i, 0]
             upper_index = self.stochastic_process_indices[i, 1]
-            self.state[:, lower_index : upper_index] = process.current_state    
-  
+            self.state[:, lower_index:upper_index] = process.current_state
 
     def _update_agent_state(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
         if self.action_type == "limit_and_market":
@@ -271,9 +272,9 @@ class TradingEnvironment(gym.Env):
                 shape=(2,),
             )
         if self.action_type == "speed":
-            return gym.spaces.Box(low=-self.max_speed, high=self.max_speed, shape=(1,))  # agent chooses speed of trading: positive buys, negative sells
-
-
+            return gym.spaces.Box(
+                low=-self.max_speed, high=self.max_speed, shape=(1,)
+            )  # agent chooses speed of trading: positive buys, negative sells
 
     @staticmethod
     def _clamp(probability):

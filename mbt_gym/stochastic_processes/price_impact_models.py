@@ -77,8 +77,8 @@ class TemporaryAndPermanentPriceImpact(PriceImpactModel):
         self.terminal_time = terminal_time
         self.step_size = self.terminal_time / self.n_steps
         super().__init__(
-            min_value=np.array([[-self.max_speed*self.terminal_time]]),
-            max_value=np.array([[self.max_speed*self.terminal_time]]),
+            min_value=np.array([[-self.max_speed*self.terminal_time*self.permanent_impact_coefficient]]),
+            max_value=np.array([[self.max_speed*self.terminal_time*self.permanent_impact_coefficient]]),
             step_size=self.step_size,
             terminal_time=0.0,
             initial_state=np.array([[0]]),

@@ -6,7 +6,7 @@ import pandas as pd
 import seaborn as sns
 
 from mbt_gym.agents.Agent import Agent
-from mbt_gym.gym.TradingEnvironment import TradingEnvironment
+from mbt_gym.gym.TradingEnvironment import TradingEnvironment, CASH_INDEX, INVENTORY_INDEX, TIME_INDEX, ASSET_PRICE_INDEX
 from mbt_gym.gym.helpers.generate_trajectory import generate_trajectory
 
 
@@ -15,9 +15,9 @@ def plot_trajectory(env: gym.Env, agent: Agent, seed: int = None):
     timestamps = get_timestamps(env)
     observations, actions, rewards = generate_trajectory(env, agent, seed)
     cum_rewards = np.cumsum(rewards, axis=2)
-    cash_holdings = observations[:, 0, :]
-    inventory = observations[:, 1, :]
-    asset_prices = observations[:, 3, :]
+    cash_holdings = observations[:, CASH_INDEX, :]
+    inventory = observations[:, INVENTORY_INDEX, :]
+    asset_prices = observations[:, ASSET_PRICE_INDEX, :]
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(20, 10))
     ax3a = ax3.twinx()
     ax1.title.set_text("cum_rewards")
@@ -92,7 +92,7 @@ def generate_results_table_and_hist(vec_env: TradingEnvironment, agent: Agent, n
     assert vec_env.num_trajectories > 1, "To generate a results table and hist, vec_env must roll out > 1 trajectory."
     observations, actions, rewards = generate_trajectory(vec_env, agent)
     total_rewards = rewards.sum(axis=-1).reshape(-1)
-    terminal_inventories = observations[:, 1, -1]
+    terminal_inventories = observations[:, INVENTORY_INDEX, -1]
     half_spreads = actions.mean(axis=(-1, -2))
 
     rows = ["Inventory"]

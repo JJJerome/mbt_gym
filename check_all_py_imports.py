@@ -23,7 +23,7 @@ def import_everything() -> None:
 
 
 def _get_all_py_file_paths() -> Set[str]:
-    all_paths = set(glob(os.path.join("largemargins", "**", "*.py"), recursive=True))
+    all_paths = set(glob(os.path.join("mbt_gym", "**", "*.py"), recursive=True))
     return all_paths
 
 

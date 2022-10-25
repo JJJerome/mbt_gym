@@ -290,3 +290,82 @@ class ShortTermJumpAlphaMidpriceModel(MidpriceModel):
 
     def _get_max_asset_price(self, initial_price, terminal_time):
         return initial_price + 4 * self.volatility * terminal_time  # TODO: what should this be?
+
+class HestonMidpriceModel(MidpriceModel):
+    #Current/Initial State with the Heston model will consist of price AND current variance, not just price
+    def __init__(
+        self, 
+        drift: float = 0.05,
+        volatility_mean_reversion: float = 3, 
+        long_variance: float = 0.04, 
+        weiner_correlation: float = -0.8, 
+        volatility_volatility: float = 0.6, 
+        initial_price: float = 100,
+        initial_variance: float = 0.2**2, 
+        terminal_time: float = 1.0,
+        step_size: float = 0.01,
+        num_trajectories: int = 1, 
+        seed: Optional[int] = None,
+    ):
+        self.drift = drift
+        self.volatility_mean_reversion = volatility_mean_reversion
+        self.terminal_time = terminal_time
+        self.weiner_correlation = weiner_correlation
+        self.long_variance = long_variance
+        self.volatility_volatility = volatility_volatility
+        super().__init__(
+            min_value = np.array([[initial_price - (self._get_max_value(initial_price, terminal_time) - initial_price)]]),
+            max_value = np.array([[self._get_max_value(initial_price, terminal_time)]]),
+            step_size = step_size, 
+            terminal_time = terminal_time,
+            initial_state = np.array([[initial_price, initial_variance]]),
+            num_trajectories = num_trajectories,
+            seed = seed,
+        )
+    
+    def update(self, arrivals:np.ndarray,fills:np.ndarray, actions:np.ndarray)->np.ndarray:
+        weiner_means = np.array([0, 0])
+        weiner_corr = np.array([[1, self.weiner_correlation], [self.weiner_correlation,1]])
+        weiners = np.random.multivariate_normal(weiner_means, cov = weiner_corr, size=self.num_trajectories)
+        self.current_state[:,0] = self.current_state[:,0]*np.exp((self.drift - self.current_state[:,1]/2)*self.step_size
+                                + np.sqrt(self.current_state[:,1])*np.sqrt(self.step_size)*weiners[:,0])
+        self.current_state[:,1] = np.abs(self.current_state[:,1] + self.volatility_mean_reversion*(self.long_variance-self.current_state[:, 1])*self.step_size + self.volatility_volatility*np.sqrt(self.current_state[:, 1])*np.sqrt(self.step_size)*weiners[:,1])
+
+    def _get_max_value(self, initial_price, terminal_time):
+        return initial_price + 4 * self.long_variance * terminal_time
+
+class ConstantElasticityofVarianceMidpriceModel(MidpriceModel):
+    def __init__(
+        self, 
+        drift: float = 0.0, 
+        volatility: float = 0.1,
+        gamma: float = 1, #gamma = 1 is just gbm
+        initial_price: float = 100,
+        terminal_time: float = 1.0,
+        step_size: float = 0.01,
+        num_trajectories: int = 1,
+        seed: Optional[int] = None,
+    ):
+        self.drift = drift
+        self.volatility = volatility
+        self.gamma = gamma
+        self.terminal_time = terminal_time
+        super().__init__(
+            min_value=np.array([[initial_price - (self._get_max_value(initial_price, terminal_time) - initial_price)]]),
+            max_value=np.array([[self._get_max_value(initial_price, terminal_time)]]),
+            step_size=step_size,
+            terminal_time=terminal_time,
+            initial_state=np.array([[initial_price]]),
+            num_trajectories=num_trajectories,
+            seed=seed,
+        )
+
+    def update(self, arrivals:np.ndarray, fills:np.ndarray, actions:np.ndarray)->np.ndarray:
+        self.current_state = (
+            self.current_state
+            + self.current_state*self.drift * self.step_size# *np.ones((self.num_trajectories, 1))
+            + self.volatility*(self.current_state**self.gamma)*np.sqrt(self.step_size)*np.random.normal(size = self.num_trajectories)
+        )
+    
+    def _get_max_value(self, initial_price, terminal_time):
+        return initial_price + 4*self.volatility*terminal_time

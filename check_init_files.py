@@ -3,7 +3,7 @@ import os
 
 if __name__ == "__main__":
     """We want to check for missing init files as they may cause tests and mypy to not run"""
-    result = [os.path.join(dp, f) for dp, dn, file_names in os.walk("largemargins") for f in file_names]
+    result = [os.path.join(dp, f) for dp, dn, file_names in os.walk(".") for f in file_names]
     result = [r for r in result if r.endswith(".py")]
 
     dirs = set([os.path.dirname(f) for f in result])

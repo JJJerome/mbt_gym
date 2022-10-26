@@ -175,9 +175,9 @@ class CarteaJaimungalOeAgent(Agent):
         zeta = (self.alpha - 0.5 * self.permanent_price_impact + np.sqrt(self.temporary_price_impact * self.phi))
         zeta /= (self.alpha - 0.5 * self.permanent_price_impact - np.sqrt(self.temporary_price_impact * self.phi))  
         initial_inventory = self.env.initial_inventory
-        for iq, q in enumerate(state[:, INVENTORY_INDEX]):
-            time_left = self.terminal_time - state[iq, TIME_INDEX]
-            action[iq, :] = gamma * initial_inventory *  ( 
+        
+        time_left = self.terminal_time - state[0, TIME_INDEX]
+        action[:, :] = gamma * initial_inventory *  ( 
                 ( zeta*np.exp(gamma*time_left) + np.exp(-gamma*time_left) ) / ( zeta*np.exp(gamma*self.terminal_time) - np.exp(-gamma*self.terminal_time) )
              )
-        return action 
+        return action

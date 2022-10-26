@@ -319,6 +319,10 @@ class TradingEnvironment(gym.Env):
                 "The stochastic processes given to an instance of TradingEnvironment must match the number of "
                 "trajectories specified."
             )
+        if hasattr(self.reward_function, "step_size"):
+            assert np.isclose(
+                self.reward_function.step_size, self.step_size, atol=0.0, rtol=0.01
+            ), f"Trading environment step size is {self.step_size} but reward function has step size = {self.reward_function.step_size}."
 
     def seed(self, seed: int = None):
         self.rng = np.random.default_rng(seed)

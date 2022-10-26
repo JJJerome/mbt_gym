@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from typing import Union, Tuple
 
 import gym
@@ -5,6 +6,7 @@ import numpy as np
 
 from gym.spaces import Box
 
+from mbt_gym.stochastic_processes.StochasticProcessModel import StochasticProcessModel
 from mbt_gym.stochastic_processes.arrival_models import ArrivalModel, PoissonArrivalModel
 from mbt_gym.stochastic_processes.fill_probability_models import FillProbabilityModel, ExponentialFillFunction
 from mbt_gym.stochastic_processes.midprice_models import MidpriceModel, BrownianMotionMidpriceModel
@@ -47,29 +49,35 @@ class TradingEnvironment(gym.Env):
         seed: int = None,
         num_trajectories: int = 1,
     ):
-        super().__init__() #TradingEnvironment, self
+        super().__init__()  # TradingEnvironment, self
         self.terminal_time = terminal_time
         self.num_trajectories = num_trajectories
         self.n_steps = n_steps
         self.step_size = self.terminal_time / self.n_steps
         self.reward_function = reward_function or PnL()
-        self.midprice_model = midprice_model or BrownianMotionMidpriceModel(step_size=self.step_size, num_trajectories=num_trajectories, seed=seed)
+        self.midprice_model = midprice_model or BrownianMotionMidpriceModel(
+            step_size=self.step_size, num_trajectories=num_trajectories
+        )
         self.arrival_model = arrival_model
         self.fill_probability_model = fill_probability_model
-        self.price_impact_model = price_impact_model 
+        self.price_impact_model = price_impact_model
+        self.action_type = action_type
+        self._check_stochastic_processes()
         self.stochastic_processes = self._get_stochastic_processes()
         self.stochastic_process_indices = self._get_stochastic_process_indices()
-        self.action_type = action_type
+        self._check_stochastic_seeds()
         self.initial_cash = initial_cash
         self.initial_inventory = initial_inventory
         self.max_inventory = max_inventory
         self._check_params()
         self.rng = np.random.default_rng(seed)
+        if seed:
+            self.seed(seed)
         self.state = self.initial_state
         self.max_stock_price = max_stock_price or self.midprice_model.max_value[0, 0]
         self.max_cash = max_cash or self._get_max_cash()
-        self.max_depth = max_depth or self._get_max_depth() 
-        self.max_speed = max_speed or self._get_max_speed() 
+        self.max_depth = max_depth or self._get_max_depth()
+        self.max_speed = max_speed or self._get_max_speed()
         self.observation_space = self._get_observation_space()
         self.action_space = self._get_action_space()
         self.half_spread = half_spread
@@ -77,28 +85,26 @@ class TradingEnvironment(gym.Env):
         self.empty_infos = [{} for _ in range(self.num_trajectories)] if self.num_trajectories > 1 else {}
         ones = np.ones((self.num_trajectories, 1))
         self.multiplier = np.append(-ones, ones, axis=1)
-        #self._check_stochastic_processes # TODO: Implement
 
     def _get_stochastic_processes(self):
-        stochastic_processes = []
-        for process in [self.midprice_model, self.arrival_model, self.fill_probability_model, self.price_impact_model]:
-            if process is not None and process.initial_vector_state.shape[1]>0:
-                stochastic_processes.append(process)
-        return stochastic_processes
+        stochastic_processes = dict()
+        for process_name in ["midprice_model", "arrival_model", "fill_probability_model", "price_impact_model"]:
+            process: StochasticProcessModel = getattr(self, process_name)
+            if process is not None:
+                stochastic_processes[process_name] = process
+        return OrderedDict(stochastic_processes)
 
     def _get_stochastic_process_indices(self):
-        number_of_processes = len(self.stochastic_processes)
-        indices = np.zeros((number_of_processes, 2))
+        process_indices = dict()
         count = 3
-        for i, process in enumerate(self.stochastic_processes):
-            indices[i, 0] = count
-            dimension = process.initial_vector_state.shape[1]
-            indices[i, 1] = count + dimension
-            count += dimension + 1
-        return indices.astype(int)
+        for process_name, process in self.stochastic_processes.items():
+            dimension = int(process.initial_vector_state.shape[1])
+            process_indices[process_name] = (count, count + dimension)
+            count += dimension
+        return OrderedDict(process_indices)
 
     def reset(self):
-        for process in self.stochastic_processes:
+        for process in self.stochastic_processes.values():
             process.reset()
         self.state = self.initial_state
         return self.state.copy()
@@ -151,12 +157,11 @@ class TradingEnvironment(gym.Env):
         return self.state
 
     def _update_market_state(self, arrivals, fills, action):
-        for i, process in enumerate(self.stochastic_processes):
+        for process_name, process in self.stochastic_processes.items():
             process.update(arrivals, fills, action)
-            lower_index = self.stochastic_process_indices[i, 0]
-            upper_index = self.stochastic_process_indices[i, 1]
-            self.state[:, lower_index : upper_index] = process.current_state    
-  
+            lower_index = self.stochastic_process_indices[process_name][0]
+            upper_index = self.stochastic_process_indices[process_name][1]
+            self.state[:, lower_index:upper_index] = process.current_state
 
     def _update_agent_state(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
         if self.action_type == "limit_and_market":
@@ -171,7 +176,7 @@ class TradingEnvironment(gym.Env):
                 self.multiplier * arrivals * fills * (self.midprice + self.half_spread * self.multiplier), axis=1
             )
             self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self.multiplier, axis=1)
-        elif self.action_type in MARKET_MAKING_ACTION_TYPES:
+        elif self.action_type in ["limit", "limit_and_market"]:
             self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self.multiplier, axis=1)
             self.state[:, CASH_INDEX] += np.sum(
                 self.multiplier * arrivals * fills * (self.midprice + self.limit_depths(action) * self.multiplier),
@@ -230,14 +235,9 @@ class TradingEnvironment(gym.Env):
     def initial_state(self) -> np.ndarray:
         scalar_initial_state = np.array([[self.initial_cash, 0, 0.0]])
         initial_state = np.repeat(scalar_initial_state, self.num_trajectories, axis=0)
-        if isinstance(self.initial_inventory, tuple) and len(self.initial_inventory) == 2:
-            initial_inventories = self.rng.integers(*self.initial_inventory, size=self.num_trajectories)
-        elif isinstance(self.initial_inventory, int):
-            initial_inventories = self.initial_inventory * np.ones((self.num_trajectories,))
-        else:
-            raise Exception("Initial inventory must be a tuple of length 2 or an int.")
+        initial_inventories = self._get_initial_inventories()
         initial_state[:, 1] = initial_inventories
-        for process in self.stochastic_processes:
+        for process in self.stochastic_processes.values():
             initial_state = np.append(initial_state, process.initial_vector_state, axis=1)
         return initial_state
 
@@ -247,7 +247,7 @@ class TradingEnvironment(gym.Env):
         model in that order."""
         low = np.array([-self.max_cash, -self.max_inventory, 0])
         high = np.array([self.max_cash, self.max_inventory, self.terminal_time])
-        for process in self.stochastic_processes:
+        for process in self.stochastic_processes.values():
             low = np.append(low, process.min_value)
             high = np.append(high, process.max_value)
         return Box(
@@ -256,8 +256,15 @@ class TradingEnvironment(gym.Env):
             dtype=np.float64,
         )
 
+    def _get_initial_inventories(self) -> np.ndarray:
+        if isinstance(self.initial_inventory, tuple) and len(self.initial_inventory) == 2:
+            return self.rng.integers(*self.initial_inventory, size=self.num_trajectories)
+        elif isinstance(self.initial_inventory, int):
+            return self.initial_inventory * np.ones((self.num_trajectories,))
+        else:
+            raise Exception("Initial inventory must be a tuple of length 2 or an int.")
+
     def _get_action_space(self) -> gym.spaces.Space:
-        assert self.action_type in ACTION_TYPES, f"Action type {self.action_type} is not in {ACTION_TYPES}."
         if self.action_type == "touch":
             return gym.spaces.MultiBinary(2)  # agent chooses spread on bid and ask
         if self.action_type == "limit":
@@ -272,27 +279,53 @@ class TradingEnvironment(gym.Env):
                 shape=(2,),
             )
         if self.action_type == "speed":
-            return gym.spaces.Box(low=-self.max_speed, high=self.max_speed, shape=(1,))  # agent chooses speed of trading: positive buys, negative sells
-
-
+            return gym.spaces.Box(
+                low=-self.max_speed, high=self.max_speed, shape=(1,)
+            )  # agent chooses speed of trading: positive buys, negative sells
 
     @staticmethod
     def _clamp(probability):
         return max(min(probability, 1), 0)
 
+    def _check_stochastic_processes(self) -> None:
+        assert self.action_type in ACTION_TYPES, f"Action type '{self.action_type}' is not in {ACTION_TYPES}."
+        if self.action_type == "touch":
+            processes = ["arrival_model"]
+        elif self.action_type in ["limit", "limit_and_market"]:
+            processes = ["arrival_model", "fill_probability_model"]
+        elif self.action_type == "speed":
+            processes = ["price_impact_model"]
+        else:
+            raise NotImplementedError
+        for process in processes:
+            self._check_process_is_not_none(process)
+
+    def _check_process_is_not_none(self, process: str):
+        assert getattr(self, process) is not None, f"Action type is '{self.action_type}' but env.{process} is None."
+
+    def _check_stochastic_seeds(self):
+        seeds = [process.seed_ for process in self.stochastic_processes.values() if process.seed_ is not None]
+        assert len(seeds) == len(
+            set(seeds)
+        ), "Stochastic processes associated to TradingEnvironment must have different seeds."
+
     def _check_params(self):
         assert self.action_type in ACTION_TYPES
-        for stochastic_process in self.stochastic_processes:
-            assert np.isclose(stochastic_process.step_size, self.step_size, atol=0.0, rtol=0.01), (
-                f"{type(self.midprice_model).__name__}.step_size = {stochastic_process.step_size}, "
+        for process in self.stochastic_processes.values():
+            assert np.isclose(process.step_size, self.step_size, atol=0.0, rtol=0.01), (
+                f"{type(self.midprice_model).__name__}.step_size = {process.step_size}, "
                 + f" but env.step_size = {self.terminal_time/self.n_steps}"
             )
-            assert stochastic_process.num_trajectories == self.num_trajectories, (
+            assert process.num_trajectories == self.num_trajectories, (
                 "The stochastic processes given to an instance of TradingEnvironment must match the number of "
                 "trajectories specified."
             )
+        if hasattr(self.reward_function, "step_size"):
+            assert np.isclose(
+                self.reward_function.step_size, self.step_size, atol=0.0, rtol=0.01
+            ), f"Trading environment step size is {self.step_size} but reward function has step size = {self.reward_function.step_size}."
 
     def seed(self, seed: int = None):
         self.rng = np.random.default_rng(seed)
-        for process in self.stochastic_processes:
-            process.seed(seed)
+        for i, process in enumerate(self.stochastic_processes.values()):
+            process.seed(seed + i + 1)

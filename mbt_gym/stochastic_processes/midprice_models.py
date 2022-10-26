@@ -68,9 +68,13 @@ class GeometricBrownianMotionMidpriceModel(MidpriceModel):
         )
 
     def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> np.ndarray:
-        self.current_state = self.current_state * np.exp(
-            (self.drift - self.volatility**2 / 2) * self.step_size * np.ones((self.num_trajectories, 1))
-            + self.volatility * sqrt(self.step_size) * self.rng.normal(size=(self.num_trajectories, 1))
+        self.current_state = (
+            self.current_state
+            + self.drift * self.current_state * self.step_size
+            + self.volatility
+            * self.current_state
+            * sqrt(self.step_size)
+            * self.rng.normal(size=(self.num_trajectories, 1))
         )
 
     def _get_max_value(self, initial_price, terminal_time):

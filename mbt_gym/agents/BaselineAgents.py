@@ -1,19 +1,23 @@
+from copy import deepcopy
+
 import gym
 import numpy as np
 import warnings
 from scipy.linalg import expm
 
 from mbt_gym.agents.Agent import Agent
-from mbt_gym.gym.TradingEnvironment import TradingEnvironment
+from mbt_gym.gym.TradingEnvironment import TradingEnvironment, INVENTORY_INDEX, TIME_INDEX
+from mbt_gym.stochastic_processes.price_impact_models import PriceImpactModel, TemporaryAndPermanentPriceImpact
 
 
 class RandomAgent(Agent):
     def __init__(self, env: gym.Env, seed: int = None):
-        self.env = env
-        self.env.action_space.seed(seed)
+        self.action_space = deepcopy(env.action_space)
+        self.action_space.seed(seed)
+        self.num_trajectories = env.num_trajectories
 
     def get_action(self, state: np.ndarray) -> np.ndarray:
-        return np.repeat(self.env.action_space.sample().reshape(1, -1), self.env.num_trajectories, axis=0)
+        return np.repeat(self.action_space.sample().reshape(1, -1), self.num_trajectories, axis=0)
 
 
 class FixedActionAgent(Agent):
@@ -26,7 +30,7 @@ class FixedActionAgent(Agent):
 
 
 class FixedSpreadAgent(Agent):
-    def __init__(self, half_spread: float = 1.0, offset: float = 0.0, env: gym.Env = TradingEnvironment()):
+    def __init__(self, env: gym.Env, half_spread: float = 1.0, offset: float = 0.0):
         self.half_spread = half_spread
         self.offset = offset
         self.env = env
@@ -77,7 +81,7 @@ class AvellanedaStoikovAgent(Agent):
         return np.append(bid_half_spread, ask_half_spread, axis=1)
 
 
-class CarteaJaimungalAgent(Agent):
+class CarteaJaimungalMmAgent(Agent):
     def __init__(
         self,
         phi: float = 2 * 10 ** (-4),
@@ -99,9 +103,9 @@ class CarteaJaimungalAgent(Agent):
 
     def get_action(self, state: np.ndarray):
         action = np.zeros(shape=(self.num_trajectories, 2))
-        for iq, q in enumerate(state[:, 1]):
+        for iq, q in enumerate(state[:, INVENTORY_INDEX]):
             inventory = q
-            current_time = state[iq, 2]
+            current_time = state[iq, TIME_INDEX]
             aux_action = np.array(self._calculate_deltas(current_time, inventory))
             action[iq, :] = aux_action[:, 0]
         return action
@@ -146,3 +150,42 @@ class CarteaJaimungalAgent(Agent):
             if i > 0:
                 Amatrix[i, i - 1] = self.lambdas[1] * np.exp(-1)
         return Amatrix, z_vector
+
+
+class CarteaJaimungalOeAgent(Agent):
+    def __init__(
+        self,
+        phi: float = 2 * 10 ** (-4),
+        alpha: float = 0.0001,
+        env: TradingEnvironment = None,
+    ):
+        self.phi = phi
+        self.alpha = alpha
+        self.env = env or TradingEnvironment()
+        self.price_impact_model = env.price_impact_model
+        assert self.env.action_type == "speed"
+        self.terminal_time = self.env.terminal_time
+        self.temporary_price_impact = self.price_impact_model.temporary_impact_coefficient
+        self.permanent_price_impact = self.price_impact_model.permanent_impact_coefficient
+        self.num_trajectories = self.env.num_trajectories
+
+    def get_action(self, state: np.ndarray):
+        action = np.zeros(shape=(self.num_trajectories, 1))
+        # The formulae below is in page 146 of Cartea, Jaimungal, Penalva (2015)
+        # Algorithmic and High-Frequency Trading
+        # Cambridge University Press
+        gamma = np.sqrt(self.phi / self.temporary_price_impact)
+        zeta = self.alpha - 0.5 * self.permanent_price_impact + np.sqrt(self.temporary_price_impact * self.phi)
+        zeta /= self.alpha - 0.5 * self.permanent_price_impact - np.sqrt(self.temporary_price_impact * self.phi)
+        initial_inventory = self.env.initial_inventory
+
+        time_left = self.terminal_time - state[0, TIME_INDEX]
+        action[:, :] = (
+            gamma
+            * initial_inventory
+            * (
+                (zeta * np.exp(gamma * time_left) + np.exp(-gamma * time_left))
+                / (zeta * np.exp(gamma * self.terminal_time) - np.exp(-gamma * self.terminal_time))
+            )
+        )
+        return action

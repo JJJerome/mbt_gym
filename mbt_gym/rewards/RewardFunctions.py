@@ -32,7 +32,7 @@ class PnL(RewardFunction):
         )
         return next_market_value - current_market_value
 
-class CjCriterion(RewardFunction):
+class CjOeCriterion(RewardFunction):
     def __init__(
         self,
         per_step_inventory_aversion: float = 0.01,
@@ -82,6 +82,10 @@ class RunningInventoryPenalty(RewardFunction):
             * next_state[:, INVENTORY_INDEX] ** self.inventory_exponent
         )
 
+
+# Cartea and Jaimungal criterion is the same as inventory adjusted PnL
+
+CjCriterion = RunningInventoryPenalty
 
 
 class ExponentialUtility(RewardFunction):

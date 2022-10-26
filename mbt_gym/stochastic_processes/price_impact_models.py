@@ -61,7 +61,6 @@ class TemporaryPowerPriceImpact(PriceImpactModel):
         return 100. # TODO: link to asset price perhaps?
 
 
-
 class TemporaryAndPermanentPriceImpact(PriceImpactModel):
     def __init__(
         self,

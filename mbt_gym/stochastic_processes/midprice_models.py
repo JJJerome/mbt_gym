@@ -296,10 +296,10 @@ class HestonMidpriceModel(MidpriceModel):
     def __init__(
         self, 
         drift: float = 0.05,
-        volatility_mean_reversion: float = 3, 
-        long_variance: float = 0.04, 
+        volatility_mean_reversion_rate: float = 3, 
+        volatility_mean_reversion_level: float = 0.04, 
         weiner_correlation: float = -0.8, 
-        volatility_volatility: float = 0.6, 
+        volatility_of_volatility: float = 0.6, 
         initial_price: float = 100,
         initial_variance: float = 0.2**2, 
         terminal_time: float = 1.0,
@@ -308,11 +308,11 @@ class HestonMidpriceModel(MidpriceModel):
         seed: Optional[int] = None,
     ):
         self.drift = drift
-        self.volatility_mean_reversion = volatility_mean_reversion
+        self.volatility_mean_reversion_rate = volatility_mean_reversion_rate
         self.terminal_time = terminal_time
         self.weiner_correlation = weiner_correlation
-        self.long_variance = long_variance
-        self.volatility_volatility = volatility_volatility
+        self.volatility_mean_reversion_level = volatility_mean_reversion_level
+        self.volatility_of_volatility = volatility_of_volatility
         super().__init__(
             min_value = np.array([[initial_price - (self._get_max_value(initial_price, terminal_time) - initial_price)]]),
             max_value = np.array([[self._get_max_value(initial_price, terminal_time)]]),
@@ -327,14 +327,18 @@ class HestonMidpriceModel(MidpriceModel):
         weiner_means = np.array([0, 0])
         weiner_corr = np.array([[1, self.weiner_correlation], [self.weiner_correlation,1]])
         weiners = np.random.multivariate_normal(weiner_means, cov = weiner_corr, size=self.num_trajectories)
-        self.current_state[:,0] = self.current_state[:,0]*np.exp((self.drift - self.current_state[:,1]/2)*self.step_size
-                                + np.sqrt(self.current_state[:,1])*np.sqrt(self.step_size)*weiners[:,0])
-        self.current_state[:,1] = np.abs(self.current_state[:,1] + self.volatility_mean_reversion*(self.long_variance-self.current_state[:, 1])*self.step_size + self.volatility_volatility*np.sqrt(self.current_state[:, 1])*np.sqrt(self.step_size)*weiners[:,1])
-
+        self.current_state[:,0] = (self.current_state[:,0]
+                                + self.drift*self.current_state[:,0]*self.step_size
+                                + np.sqrt(self.current_state[:,1]*self.step_size)*self.current_state[:,0]*weiners[:, 0]
+                                )
+        self.current_state[:,1] = np.abs(self.current_state[:,1]
+                                + self.volatility_mean_reversion_rate*(self.volatility_mean_reversion_level - self.current_state[:,1])*self.step_size
+                                + self.volatility_of_volatility*np.sqrt(self.current_state[:,1]*self.step_size)*weiners[:,1]
+                                )
     def _get_max_value(self, initial_price, terminal_time):
-        return initial_price + 4 * self.long_variance * terminal_time
+        return initial_price + 4 * self.volatility_mean_reversion_level * terminal_time
 
-class ConstantElasticityofVarianceMidpriceModel(MidpriceModel):
+class ConstantElasticityOfVarianceMidpriceModel(MidpriceModel):
     def __init__(
         self, 
         drift: float = 0.0, 

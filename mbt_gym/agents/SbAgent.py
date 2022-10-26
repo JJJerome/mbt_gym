@@ -13,7 +13,7 @@ class SbAgent(Agent):
     def get_action(self, state: np.ndarray) -> np.ndarray:
         if self.reduced_training:
             state = state[-2:]
-        return np.reshape(self.model.predict(state, deterministic=True)[0], 2)
+        return np.reshape(self.model.predict(state, deterministic=True)[0], -1)
 
     def train(self, total_timesteps: int = 100000):
         self.model.learn(total_timesteps=total_timesteps)

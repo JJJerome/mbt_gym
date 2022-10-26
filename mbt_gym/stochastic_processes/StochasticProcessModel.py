@@ -26,6 +26,7 @@ class StochasticProcessModel(metaclass=abc.ABCMeta):
         self._check_attribute_shapes()
         self.current_state = copy(self.initial_vector_state)
         self.rng = default_rng(seed)
+        self.seed_ = seed
 
     def reset(self):
         self.current_state = self.initial_vector_state
@@ -36,6 +37,7 @@ class StochasticProcessModel(metaclass=abc.ABCMeta):
 
     def seed(self, seed: int = None):
         self.rng = default_rng(seed)
+        self.seed_ = seed
 
     def _check_attribute_shapes(self):
         for name in ["initial_state", "min_value", "max_value"]:

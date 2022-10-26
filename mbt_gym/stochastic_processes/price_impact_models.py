@@ -58,4 +58,4 @@ class TemporaryPowerPriceImpact(PriceImpactModel):
 
     @property
     def max_speed(self) -> float:
-        return 100. # TODO: link to asset price perhaps?
+        return 100.0  # TODO: link to asset price perhaps?

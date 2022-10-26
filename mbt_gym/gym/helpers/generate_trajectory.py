@@ -7,7 +7,6 @@ from mbt_gym.agents.Agent import Agent
 
 def generate_trajectory(env: gym.Env, agent: Agent, seed: int = None, include_log_probs: bool = False):
     if seed is not None:
-        np.random.seed(seed)
         env.seed(seed)
     obs_space_dim = env.observation_space.shape[0]
     action_space_dim = env.action_space.shape[0]

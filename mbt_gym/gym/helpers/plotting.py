@@ -6,7 +6,13 @@ import pandas as pd
 import seaborn as sns
 
 from mbt_gym.agents.Agent import Agent
-from mbt_gym.gym.TradingEnvironment import TradingEnvironment, CASH_INDEX, INVENTORY_INDEX, TIME_INDEX, ASSET_PRICE_INDEX
+from mbt_gym.gym.TradingEnvironment import (
+    TradingEnvironment,
+    CASH_INDEX,
+    INVENTORY_INDEX,
+    TIME_INDEX,
+    ASSET_PRICE_INDEX,
+)
 from mbt_gym.gym.helpers.generate_trajectory import generate_trajectory
 
 
@@ -14,7 +20,8 @@ def plot_trajectory(env: gym.Env, agent: Agent, seed: int = None):
     # assert env.num_trajectories == 1, "Plotting a trajectory can only be done when env.num_trajectories == 1."
     timestamps = get_timestamps(env)
     observations, actions, rewards = generate_trajectory(env, agent, seed)
-    cum_rewards = np.cumsum(rewards, axis=2)
+    rewards = np.squeeze(rewards, axis=1)
+    cum_rewards = np.cumsum(rewards, axis=-1)
     cash_holdings = observations[:, CASH_INDEX, :]
     inventory = observations[:, INVENTORY_INDEX, :]
     asset_prices = observations[:, ASSET_PRICE_INDEX, :]
@@ -25,7 +32,7 @@ def plot_trajectory(env: gym.Env, agent: Agent, seed: int = None):
     ax3.title.set_text("inventory and cash holdings")
     ax4.title.set_text("quoted spreads")
     for i in range(env.num_trajectories):
-        ax1.plot(timestamps[1:], cum_rewards[i, 0, :])
+        ax1.plot(timestamps[1:], cum_rewards[i, :])
         ax2.plot(timestamps, asset_prices[i, :])
         ax3.plot(
             timestamps, inventory[i, :], label=f"inventory {i}", color="r", alpha=(i + 1) / (env.num_trajectories + 1)

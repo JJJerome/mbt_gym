@@ -56,7 +56,7 @@ class TradingEnvironment(gym.Env):
         self.step_size = self.terminal_time / self.n_steps
         self.reward_function = reward_function or PnL()
         self.midprice_model = midprice_model or BrownianMotionMidpriceModel(
-            step_size=self.step_size, num_trajectories=num_trajectories, seed=seed
+            step_size=self.step_size, num_trajectories=num_trajectories
         )
         self.arrival_model = arrival_model
         self.fill_probability_model = fill_probability_model
@@ -65,11 +65,14 @@ class TradingEnvironment(gym.Env):
         self._check_stochastic_processes()
         self.stochastic_processes = self._get_stochastic_processes()
         self.stochastic_process_indices = self._get_stochastic_process_indices()
+        self._check_stochastic_seeds()
         self.initial_cash = initial_cash
         self.initial_inventory = initial_inventory
         self.max_inventory = max_inventory
         self._check_params()
         self.rng = np.random.default_rng(seed)
+        if seed:
+            self.seed(seed)
         self.state = self.initial_state
         self.max_stock_price = max_stock_price or self.midprice_model.max_value[0, 0]
         self.max_cash = max_cash or self._get_max_cash()
@@ -299,6 +302,12 @@ class TradingEnvironment(gym.Env):
     def _check_process_is_not_none(self, process: str):
         assert getattr(self, process) is not None, f"Action type is '{self.action_type}' but env.{process} is None."
 
+    def _check_stochastic_seeds(self):
+        seeds = [process.seed_ for process in self.stochastic_processes.values() if process.seed_ is not None]
+        assert len(seeds) == len(
+            set(seeds)
+        ), "Stochastic processes associated to TradingEnvironment must have different seeds."
+
     def _check_params(self):
         assert self.action_type in ACTION_TYPES
         for process in self.stochastic_processes.values():
@@ -313,5 +322,5 @@ class TradingEnvironment(gym.Env):
 
     def seed(self, seed: int = None):
         self.rng = np.random.default_rng(seed)
-        for process in self.stochastic_processes.values():
-            process.seed(seed)
+        for i, process in enumerate(self.stochastic_processes.values()):
+            process.seed(seed + i + 1)

@@ -171,16 +171,21 @@ class CarteaJaimungalOeAgent(Agent):
 
     def get_action(self, state: np.ndarray):
         action = np.zeros(shape=(self.num_trajectories, 1))
-        # The formulae below is in page 146 of Cartea, Jaimungal, Penalva (2015) 
+        # The formulae below is in page 146 of Cartea, Jaimungal, Penalva (2015)
         # Algorithmic and High-Frequency Trading
         # Cambridge University Press
-        gamma = np.sqrt(self.phi/self.temporary_price_impact)
-        zeta = (self.alpha - 0.5 * self.permanent_price_impact + np.sqrt(self.temporary_price_impact * self.phi))
-        zeta /= (self.alpha - 0.5 * self.permanent_price_impact - np.sqrt(self.temporary_price_impact * self.phi))  
+        gamma = np.sqrt(self.phi / self.temporary_price_impact)
+        zeta = self.alpha - 0.5 * self.permanent_price_impact + np.sqrt(self.temporary_price_impact * self.phi)
+        zeta /= self.alpha - 0.5 * self.permanent_price_impact - np.sqrt(self.temporary_price_impact * self.phi)
         initial_inventory = self.env.initial_inventory
-        
+
         time_left = self.terminal_time - state[0, TIME_INDEX]
-        action[:, :] = gamma * initial_inventory *  ( 
-                ( zeta*np.exp(gamma*time_left) + np.exp(-gamma*time_left) ) / ( zeta*np.exp(gamma*self.terminal_time) - np.exp(-gamma*self.terminal_time) )
-             )
+        action[:, :] = (
+            gamma
+            * initial_inventory
+            * (
+                (zeta * np.exp(gamma * time_left) + np.exp(-gamma * time_left))
+                / (zeta * np.exp(gamma * self.terminal_time) - np.exp(-gamma * self.terminal_time))
+            )
+        )
         return action

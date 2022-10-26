@@ -32,6 +32,7 @@ class PnL(RewardFunction):
         )
         return next_market_value - current_market_value
 
+
 class CjOeCriterion(RewardFunction):
     def __init__(
         self,
@@ -55,6 +56,7 @@ class CjOeCriterion(RewardFunction):
             - dt * self.per_step_inventory_aversion * next_state[:, INVENTORY_INDEX] ** self.inventory_exponent
             - 2 * dt * self.terminal_inventory_aversion * np.squeeze(action) * current_state[:, INVENTORY_INDEX]
         )
+
 
 class RunningInventoryPenalty(RewardFunction):
     def __init__(

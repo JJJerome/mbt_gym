@@ -58,7 +58,7 @@ class TemporaryPowerPriceImpact(PriceImpactModel):
 
     @property
     def max_speed(self) -> float:
-        return 100. # TODO: link to asset price perhaps?
+        return 100.0  # TODO: link to asset price perhaps?
 
 
 class TemporaryAndPermanentPriceImpact(PriceImpactModel):
@@ -76,8 +76,8 @@ class TemporaryAndPermanentPriceImpact(PriceImpactModel):
         self.terminal_time = terminal_time
         self.step_size = self.terminal_time / self.n_steps
         super().__init__(
-            min_value=np.array([[-self.max_speed*self.terminal_time*self.permanent_impact_coefficient]]),
-            max_value=np.array([[self.max_speed*self.terminal_time*self.permanent_impact_coefficient]]),
+            min_value=np.array([[-self.max_speed * self.terminal_time * self.permanent_impact_coefficient]]),
+            max_value=np.array([[self.max_speed * self.terminal_time * self.permanent_impact_coefficient]]),
             step_size=self.step_size,
             terminal_time=0.0,
             initial_state=np.array([[0]]),
@@ -87,11 +87,10 @@ class TemporaryAndPermanentPriceImpact(PriceImpactModel):
 
     def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray):
         self.current_state = self.current_state + self.permanent_impact_coefficient * actions * self.step_size
-        
 
     def get_impact(self, action) -> np.ndarray:
         return self.temporary_impact_coefficient * action + self.current_state
 
     @property
     def max_speed(self) -> float:
-        return 100. # TODO: link to asset price perhaps?
+        return 100.0  # TODO: link to asset price perhaps?

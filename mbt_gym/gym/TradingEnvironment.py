@@ -173,7 +173,7 @@ class TradingEnvironment(gym.Env):
                 self.multiplier * arrivals * fills * (self.midprice + self.half_spread * self.multiplier), axis=1
             )
             self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self.multiplier, axis=1)
-        elif self.action_type in MARKET_MAKING_ACTION_TYPES:
+        elif self.action_type in ["limit", "limit_and_market"]:
             self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self.multiplier, axis=1)
             self.state[:, CASH_INDEX] += np.sum(
                 self.multiplier * arrivals * fills * (self.midprice + self.limit_depths(action) * self.multiplier),

@@ -100,7 +100,7 @@ class TradingEnvironment(gym.Env):
         for process_name, process in self.stochastic_processes.items():
             dimension = int(process.initial_vector_state.shape[1])
             process_indices[process_name] = (count, count + dimension)
-            count += dimension + (dimension > 0)
+            count += dimension
         return OrderedDict(process_indices)
 
     def reset(self):

@@ -1,6 +1,7 @@
 import gym
 
 import numpy as np
+from mbt_gym.gym.TradingEnvironment import INVENTORY_INDEX, TIME_INDEX
 
 from math import sqrt
 
@@ -10,7 +11,7 @@ class ReduceStateSizeWrapper(gym.Wrapper):
     :param env: (gym.Env) Gym environment that will be wrapped
     """
 
-    def __init__(self, env, list_of_state_indices: list = [1, 2]):
+    def __init__(self, env, list_of_state_indices: list = [INVENTORY_INDEX, TIME_INDEX]):
         # Call the parent constructor, so we can access self.env later
         super(ReduceStateSizeWrapper, self).__init__(env)
         assert type(env.observation_space) == gym.spaces.box.Box
@@ -74,38 +75,6 @@ class NormaliseASObservation(gym.Wrapper):
         return obs / self.normalisation_factor, reward, done, info
 
 
-class LearnTerminalStrategy(gym.Wrapper):
-    """
-    :param env: (gym.Env) Gym environment that will be wrapped
-    """
-
-    def __init__(self, env, num_final_steps: int = 5):
-        # Call the parent constructor, so we can access self.env later
-        super(LearnTerminalStrategy, self).__init__(env)
-        self.num_final_steps = num_final_steps
-        env.observation_space.low[-1] = env.terminal_time - num_final_steps * env.step_size
-
-    def reset(self):
-        """
-        Reset the environment
-        """
-        self.env.reset()
-        start_time = self.env.terminal_time - self.num_final_steps * self.env.step_size
-        start_asset_price = (
-            self.env.mean_reversion_level * self.env.terminal_time
-            + self.env.volatility * sqrt(start_time) * self.env.rng.normal()
-        )
-        start_cash = self.env.rng.normal(self.env.initial_cash, self.env.initial_cash / 2)
-        start_inventory = self.env.rng.integers(self.env.observation_space.low[2], self.env.observation_space.high[2])
-        self.env.state = np.array([start_asset_price, start_cash, start_inventory, start_time])
-        return self.env.state
-
-    def step(self, action):
-        """
-        :param action: ([float] or int) Action taken by the agent
-        :return: (np.ndarray, float, bool, dict) observation, reward, is the episode over?, additional informations
-        """
-        return self.env.step(action)
 
 
 class RemoveTerminalRewards(gym.Wrapper):

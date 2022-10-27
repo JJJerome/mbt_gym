@@ -171,7 +171,7 @@ class CarteaJaimungalOeAgent(Agent):
 
     def get_action(self, state: np.ndarray):
         action = np.zeros(shape=(self.num_trajectories, 1))
-        # The formulae below is in page 146 of Cartea, Jaimungal, Penalva (2015)
+        # The formulae below is in page 147 of Cartea, Jaimungal, Penalva (2015)
         # Algorithmic and High-Frequency Trading
         # Cambridge University Press
         gamma = np.sqrt(self.phi / self.temporary_price_impact)

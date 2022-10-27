@@ -268,6 +268,7 @@ class TradingEnvironment(gym.Env):
         if self.action_type == "touch":
             return gym.spaces.MultiBinary(2)  # agent chooses spread on bid and ask
         if self.action_type == "limit":
+            assert self.max_depth is not None, "For limit orders max_depth cannot be NoneType"
             return gym.spaces.Box(low=0.0, high=self.max_depth, shape=(2,))  # agent chooses spread on bid and ask
         if self.action_type == "limit_and_market":
             return gym.spaces.Box(

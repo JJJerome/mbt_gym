@@ -75,8 +75,6 @@ class NormaliseASObservation(gym.Wrapper):
         return obs / self.normalisation_factor, reward, done, info
 
 
-
-
 class RemoveTerminalRewards(gym.Wrapper):
     """
     :param env: (gym.Env) Gym environment that will be wrapped

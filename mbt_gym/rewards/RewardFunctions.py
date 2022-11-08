@@ -54,7 +54,11 @@ class CjOeCriterion(RewardFunction):
         return (
             self.pnl.calculate(current_state, action, next_state, is_terminal_step)
             - dt * self.per_step_inventory_aversion * next_state[:, INVENTORY_INDEX] ** self.inventory_exponent
-            - 2 * dt * self.terminal_inventory_aversion * np.squeeze(action) * current_state[:, INVENTORY_INDEX]
+            - self.inventory_exponent
+            * dt
+            * self.terminal_inventory_aversion
+            * np.squeeze(action)
+            * (current_state[:, INVENTORY_INDEX]) ** (self.inventory_exponent - 1)
         )
 
 

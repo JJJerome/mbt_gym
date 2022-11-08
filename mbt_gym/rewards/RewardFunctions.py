@@ -62,6 +62,38 @@ class CjOeCriterion(RewardFunction):
         )
 
 
+class CjMmCriterion(RewardFunction):
+    """A version of the Cartea-Jaimungal criterion which uses Ito's lemma for Poisson processes to split the negative
+    reward attributed to terminal inventory aversion over the trajectory of the inventory."""
+
+    def __init__(
+        self,
+        per_step_inventory_aversion: float = 0.01,
+        terminal_inventory_aversion: float = 0.0,
+        inventory_exponent: float = 2.0,
+        step_size: float = 1.0 / 200,
+    ):
+        self.per_step_inventory_aversion = per_step_inventory_aversion
+        self.terminal_inventory_aversion = terminal_inventory_aversion
+        self.pnl = PnL()
+        self.inventory_exponent = inventory_exponent
+        self.step_size = step_size
+
+    def calculate(
+        self, current_state: np.ndarray, action: np.ndarray, next_state: np.ndarray, is_terminal_step: bool = False
+    ) -> float:
+        dt = next_state[:, TIME_INDEX] - current_state[:, TIME_INDEX]
+        return (
+            self.pnl.calculate(current_state, action, next_state, is_terminal_step)
+            - dt * self.per_step_inventory_aversion * next_state[:, INVENTORY_INDEX] ** self.inventory_exponent
+            - self.terminal_inventory_aversion
+            * (
+                next_state[:, INVENTORY_INDEX] ** self.inventory_exponent
+                - current_state[:, INVENTORY_INDEX] ** self.inventory_exponent
+            )
+        )
+
+
 class RunningInventoryPenalty(RewardFunction):
     def __init__(
         self,

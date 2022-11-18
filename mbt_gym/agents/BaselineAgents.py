@@ -188,4 +188,4 @@ class CarteaJaimungalOeAgent(Agent):
                 / (zeta * np.exp(gamma * self.terminal_time) - np.exp(-gamma * self.terminal_time))
             )
         )
-        return action
+        return - np.sign(initial_inventory) * action

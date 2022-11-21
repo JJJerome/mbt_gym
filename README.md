@@ -10,6 +10,36 @@ If you wish to contribute to this repository, please read the details of how to 
 [CONTRIBUTING.md](./CONTRIBUTING.md) file in the root directory of the repository. For ideas on code that you could 
 contribute, please look at the [roadmap](./roadmap.md).  
 
+## Using mbt_gym with Docker
+
+To use the `mbt_gym` package from within a docker container (see [instructions on how to install docker](https://docs.docker.com/engine/install/ubuntu/))
+, first change directory into the
+docker subdirectory using `cd docker` and then follow the instructions below.
+
+### Building
+
+To build the container:
+
+```
+sh build_image.sh
+```
+
+### Running
+
+Run the start container script (mounting ../, therefore mounting `mbt_gym`), and specify a port for jupyter notebook:
+
+```
+sh start_container.sh 8877
+```
+
+(Note: if you wish to add gpus to container, just add ```--gpus device=0``` to ```start_container.sh``` to use one gpu 
+or ```--gpus all``` to add all gpus available.)
+
+To work in the container via shell:
+
+```
+sh exec_mbt_gym.sh
+```
 
 ## Citing mbt_gym
 

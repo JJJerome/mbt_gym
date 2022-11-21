@@ -45,11 +45,12 @@ class TradingEnvironment(gym.Env):
         max_depth: float = None,
         max_speed: float = None,
         half_spread: float = None,
+        randomise_start_time: bool = False,
         info_calculator: InfoCalculator = None,
         seed: int = None,
         num_trajectories: int = 1,
     ):
-        super().__init__()  # TradingEnvironment, self
+        super(TradingEnvironment, self).__init__()
         self.terminal_time = terminal_time
         self.num_trajectories = num_trajectories
         self.n_steps = n_steps
@@ -73,6 +74,7 @@ class TradingEnvironment(gym.Env):
         self.rng = np.random.default_rng(seed)
         if seed:
             self.seed(seed)
+        self.randomise_start_time = randomise_start_time
         self.state = self.initial_state
         self.max_stock_price = max_stock_price or self.midprice_model.max_value[0, 0]
         self.max_cash = max_cash or self._get_max_cash()
@@ -235,8 +237,9 @@ class TradingEnvironment(gym.Env):
     def initial_state(self) -> np.ndarray:
         scalar_initial_state = np.array([[self.initial_cash, 0, 0.0]])
         initial_state = np.repeat(scalar_initial_state, self.num_trajectories, axis=0)
-        initial_inventories = self._get_initial_inventories()
-        initial_state[:, 1] = initial_inventories
+        if self.randomise_start_time:
+            initial_state[:, TIME_INDEX] = self._get_random_start_time() * np.ones((self.num_trajectories,))
+        initial_state[:, INVENTORY_INDEX] = self._get_initial_inventories()
         for process in self.stochastic_processes.values():
             initial_state = np.append(initial_state, process.initial_vector_state, axis=1)
         return initial_state
@@ -255,6 +258,10 @@ class TradingEnvironment(gym.Env):
             high=high,
             dtype=np.float64,
         )
+
+    def _get_random_start_time(self):
+        return np.clip(np.random.randint(-self.n_steps, self.n_steps), 0, self.n_steps) * self.step_size
+
 
     def _get_initial_inventories(self) -> np.ndarray:
         if isinstance(self.initial_inventory, tuple) and len(self.initial_inventory) == 2:

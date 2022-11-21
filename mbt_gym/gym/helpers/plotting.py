@@ -38,7 +38,11 @@ def plot_trajectory(env: gym.Env, agent: Agent, seed: int = None):
         ax1.plot(timestamps[1:], cum_rewards[i, :])
         ax2.plot(timestamps, asset_prices[i, :])
         ax3.plot(
-            timestamps, inventory[i, :], label=f"inventory"+traj_label, color="r", alpha=(i + 1) / (env.num_trajectories + 1)
+            timestamps,
+            inventory[i, :],
+            label=f"inventory" + traj_label,
+            color="r",
+            alpha=(i + 1) / (env.num_trajectories + 1),
         )
         ax3a.plot(
             timestamps,
@@ -51,7 +55,7 @@ def plot_trajectory(env: gym.Env, agent: Agent, seed: int = None):
             ax4.plot(
                 timestamps[0:-1],
                 actions[i, j, :],
-                label = f"Action {j}"+traj_label,
+                label=f"Action {j}" + traj_label,
                 color=colors[j],
                 alpha=(i + 1) / (env.num_trajectories + 1),
             )

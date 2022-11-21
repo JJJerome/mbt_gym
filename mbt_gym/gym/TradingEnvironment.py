@@ -262,7 +262,6 @@ class TradingEnvironment(gym.Env):
     def _get_random_start_time(self):
         return np.clip(np.random.randint(-self.n_steps, self.n_steps), 0, self.n_steps) * self.step_size
 
-
     def _get_initial_inventories(self) -> np.ndarray:
         if isinstance(self.initial_inventory, tuple) and len(self.initial_inventory) == 2:
             return self.rng.integers(*self.initial_inventory, size=self.num_trajectories)

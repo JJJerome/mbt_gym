@@ -45,7 +45,7 @@ class TradingEnvironment(gym.Env):
         max_depth: float = None,
         max_speed: float = None,
         half_spread: float = None,
-        randomise_start_time: bool = False,
+        random_start: tuple = None,  # The minimum and the maximum random start of the episode given as a proportion.
         info_calculator: InfoCalculator = None,
         seed: int = None,
         num_trajectories: int = 1,
@@ -74,7 +74,7 @@ class TradingEnvironment(gym.Env):
         self.rng = np.random.default_rng(seed)
         if seed:
             self.seed(seed)
-        self.randomise_start_time = randomise_start_time
+        self.random_start = random_start
         self.state = self.initial_state
         self.max_stock_price = max_stock_price or self.midprice_model.max_value[0, 0]
         self.max_cash = max_cash or self._get_max_cash()
@@ -116,7 +116,7 @@ class TradingEnvironment(gym.Env):
             action = action.reshape(self.num_trajectories, self.action_space.shape[0])
         current_state = self.state.copy()
         next_state = self._update_state(action)
-        done = self.state[0, 2] >= self.terminal_time - self.step_size / 2
+        done = self.state[0, TIME_INDEX] >= self.terminal_time - self.step_size / 2
         dones = np.full((self.num_trajectories,), done, dtype=bool)
         rewards = self.reward_function.calculate(current_state, action, next_state, done)
         infos = self.empty_infos
@@ -237,7 +237,7 @@ class TradingEnvironment(gym.Env):
     def initial_state(self) -> np.ndarray:
         scalar_initial_state = np.array([[self.initial_cash, 0, 0.0]])
         initial_state = np.repeat(scalar_initial_state, self.num_trajectories, axis=0)
-        if self.randomise_start_time:
+        if self.random_start is not None:
             initial_state[:, TIME_INDEX] = self._get_random_start_time() * np.ones((self.num_trajectories,))
         initial_state[:, INVENTORY_INDEX] = self._get_initial_inventories()
         for process in self.stochastic_processes.values():
@@ -260,7 +260,9 @@ class TradingEnvironment(gym.Env):
         )
 
     def _get_random_start_time(self):
-        return np.clip(np.random.randint(-self.n_steps, self.n_steps), 0, self.n_steps) * self.step_size
+        assert self.random_start[0] < self.random_start[1], "Random start proportion min must be less than max."
+        random_step = np.random.randint(self.random_start[0] * self.n_steps, self.random_start[1] * self.n_steps)
+        return np.clip(random_step, 0, self.n_steps) * self.step_size
 
     def _get_initial_inventories(self) -> np.ndarray:
         if isinstance(self.initial_inventory, tuple) and len(self.initial_inventory) == 2:

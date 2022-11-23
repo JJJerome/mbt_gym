@@ -45,8 +45,8 @@ class TradingEnvironment(gym.Env):
         max_depth: float = None,
         max_speed: float = None,
         half_spread: float = None,
-        random_start: tuple = None,  # The minimum and the maximum random start of the episode given as a proportion.
-        info_calculator: InfoCalculator = None,
+        random_start: Union[float, int, tuple, list] = None,  # The minimum and the maximum random start of the ...
+        info_calculator: InfoCalculator = None,               # episode given as a proportion.
         seed: int = None,
         num_trajectories: int = 1,
     ):
@@ -260,8 +260,13 @@ class TradingEnvironment(gym.Env):
         )
 
     def _get_random_start_time(self):
-        assert self.random_start[0] < self.random_start[1], "Random start proportion min must be less than max."
-        random_step = np.random.randint(self.random_start[0] * self.n_steps, self.random_start[1] * self.n_steps)
+        if isinstance(self.random_start, (float, int)):
+            random_step = self.random_start * self.n_steps
+        elif isinstance(self.random_start, (tuple, list, np.ndarray)):
+            assert self.random_start[0] <= self.random_start[1], "Random start proportion min must be less than max."
+            random_step = np.random.randint(self.random_start[0] * self.n_steps, self.random_start[1] * self.n_steps)
+        else:
+            raise NotImplementedError
         return np.clip(random_step, 0, self.n_steps) * self.step_size
 
     def _get_initial_inventories(self) -> np.ndarray:

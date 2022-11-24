@@ -46,7 +46,7 @@ class TradingEnvironment(gym.Env):
         max_speed: float = None,
         half_spread: float = None,
         random_start: Union[float, int, tuple, list] = None,  # The minimum and the maximum random start of the ...
-        info_calculator: InfoCalculator = None,               # episode given as a proportion.
+        info_calculator: InfoCalculator = None,  # episode given as a proportion.
         seed: int = None,
         num_trajectories: int = 1,
     ):
@@ -109,6 +109,7 @@ class TradingEnvironment(gym.Env):
         for process in self.stochastic_processes.values():
             process.reset()
         self.state = self.initial_state
+        self.reward_function.reset(self.state.copy())
         return self.state.copy()
 
     def step(self, action: np.ndarray):

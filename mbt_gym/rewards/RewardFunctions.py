@@ -81,12 +81,15 @@ class CjMmCriterion(RewardFunction):
         per_step_inventory_aversion: float = 0.01,
         terminal_inventory_aversion: float = 0.0,
         inventory_exponent: float = 2.0,
+        terminal_time: float = 1.0,
     ):
         self.per_step_inventory_aversion = per_step_inventory_aversion
         self.terminal_inventory_aversion = terminal_inventory_aversion
         self.pnl = PnL()
         self.inventory_exponent = inventory_exponent
+        self.terminal_time = terminal_time
         self.initial_inventory = None
+        self.episode_length = None
 
     def calculate(
         self, current_state: np.ndarray, action: np.ndarray, next_state: np.ndarray, is_terminal_step: bool = False
@@ -99,12 +102,13 @@ class CjMmCriterion(RewardFunction):
             * (
                 next_state[:, INVENTORY_INDEX] ** self.inventory_exponent
                 - current_state[:, INVENTORY_INDEX] ** self.inventory_exponent
-                - dt * self.initial_inventory**2
+                - dt * (self.terminal_time / self.episode_length) * self.initial_inventory**2
             )
         )
 
     def reset(self, initial_state: np.ndarray):
         self.initial_inventory = initial_state[:, INVENTORY_INDEX]
+        self.episode_length = self.terminal_time - initial_state[:, TIME_INDEX]
 
 
 class RunningInventoryPenalty(RewardFunction):

@@ -102,7 +102,7 @@ class CjMmCriterion(RewardFunction):
             * (
                 next_state[:, INVENTORY_INDEX] ** self.inventory_exponent
                 - current_state[:, INVENTORY_INDEX] ** self.inventory_exponent
-                - dt * (self.terminal_time / self.episode_length) * self.initial_inventory**2
+                - dt / self.episode_length * self.initial_inventory**self.inventory_exponent
             )
         )
 

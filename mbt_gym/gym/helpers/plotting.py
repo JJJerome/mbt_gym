@@ -20,6 +20,8 @@ def plot_trajectory(env: gym.Env, agent: Agent, seed: int = None):
     # assert env.num_trajectories == 1, "Plotting a trajectory can only be done when env.num_trajectories == 1."
     timestamps = get_timestamps(env)
     observations, actions, rewards = generate_trajectory(env, agent, seed)
+    action_dim = actions.shape[1]
+    colors = ["r", "k", "b", "g"]
     rewards = np.squeeze(rewards, axis=1)
     cum_rewards = np.cumsum(rewards, axis=-1)
     cash_holdings = observations[:, CASH_INDEX, :]
@@ -30,34 +32,33 @@ def plot_trajectory(env: gym.Env, agent: Agent, seed: int = None):
     ax1.title.set_text("cum_rewards")
     ax2.title.set_text("asset_prices")
     ax3.title.set_text("inventory and cash holdings")
-    ax4.title.set_text("quoted spreads")
+    ax4.title.set_text("Actions")
     for i in range(env.num_trajectories):
+        traj_label = f" trajectory {i}" if env.num_trajectories > 1 else ""
         ax1.plot(timestamps[1:], cum_rewards[i, :])
         ax2.plot(timestamps, asset_prices[i, :])
         ax3.plot(
-            timestamps, inventory[i, :], label=f"inventory {i}", color="r", alpha=(i + 1) / (env.num_trajectories + 1)
+            timestamps,
+            inventory[i, :],
+            label=f"inventory" + traj_label,
+            color="r",
+            alpha=(i + 1) / (env.num_trajectories + 1),
         )
         ax3a.plot(
             timestamps,
             cash_holdings[i, :],
-            label=f"cash holdings {i}",
+            label=f"cash holdings" + traj_label,
             color="b",
             alpha=(i + 1) / (env.num_trajectories + 1),
         )
-        ax4.plot(
-            timestamps[0:-1],
-            actions[i, 0, :],
-            label=f"bid half spread {i}",
-            color="r",
-            alpha=(i + 1) / (env.num_trajectories + 1),
-        )
-        ax4.plot(
-            timestamps[0:-1],
-            actions[i, 1, :],
-            label=f"ask half spread {i}",
-            color="b",
-            alpha=(i + 1) / (env.num_trajectories + 1),
-        )
+        for j in range(action_dim):
+            ax4.plot(
+                timestamps[0:-1],
+                actions[i, j, :],
+                label=f"Action {j}" + traj_label,
+                color=colors[j],
+                alpha=(i + 1) / (env.num_trajectories + 1),
+            )
     ax3.legend()
     ax4.legend()
     plt.show()

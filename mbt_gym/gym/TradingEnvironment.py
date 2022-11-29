@@ -45,11 +45,12 @@ class TradingEnvironment(gym.Env):
         max_depth: float = None,
         max_speed: float = None,
         half_spread: float = None,
-        info_calculator: InfoCalculator = None,
+        random_start: Union[float, int, tuple, list] = None,  # The minimum and the maximum random start of the ...
+        info_calculator: InfoCalculator = None,  # episode given as a proportion.
         seed: int = None,
         num_trajectories: int = 1,
     ):
-        super().__init__()  # TradingEnvironment, self
+        super(TradingEnvironment, self).__init__()
         self.terminal_time = terminal_time
         self.num_trajectories = num_trajectories
         self.n_steps = n_steps
@@ -73,6 +74,7 @@ class TradingEnvironment(gym.Env):
         self.rng = np.random.default_rng(seed)
         if seed:
             self.seed(seed)
+        self.random_start = random_start
         self.state = self.initial_state
         self.max_stock_price = max_stock_price or self.midprice_model.max_value[0, 0]
         self.max_cash = max_cash or self._get_max_cash()
@@ -107,6 +109,7 @@ class TradingEnvironment(gym.Env):
         for process in self.stochastic_processes.values():
             process.reset()
         self.state = self.initial_state
+        self.reward_function.reset(self.state.copy())
         return self.state.copy()
 
     def step(self, action: np.ndarray):
@@ -114,7 +117,7 @@ class TradingEnvironment(gym.Env):
             action = action.reshape(self.num_trajectories, self.action_space.shape[0])
         current_state = self.state.copy()
         next_state = self._update_state(action)
-        done = self.state[0, 2] >= self.terminal_time - self.step_size / 2
+        done = self.state[0, TIME_INDEX] >= self.terminal_time - self.step_size / 2
         dones = np.full((self.num_trajectories,), done, dtype=bool)
         rewards = self.reward_function.calculate(current_state, action, next_state, done)
         infos = self.empty_infos
@@ -235,8 +238,9 @@ class TradingEnvironment(gym.Env):
     def initial_state(self) -> np.ndarray:
         scalar_initial_state = np.array([[self.initial_cash, 0, 0.0]])
         initial_state = np.repeat(scalar_initial_state, self.num_trajectories, axis=0)
-        initial_inventories = self._get_initial_inventories()
-        initial_state[:, 1] = initial_inventories
+        if self.random_start is not None:
+            initial_state[:, TIME_INDEX] = self._get_random_start_time() * np.ones((self.num_trajectories,))
+        initial_state[:, INVENTORY_INDEX] = self._get_initial_inventories()
         for process in self.stochastic_processes.values():
             initial_state = np.append(initial_state, process.initial_vector_state, axis=1)
         return initial_state
@@ -255,6 +259,16 @@ class TradingEnvironment(gym.Env):
             high=high,
             dtype=np.float64,
         )
+
+    def _get_random_start_time(self):
+        if isinstance(self.random_start, (float, int)):
+            random_step = self.random_start * self.n_steps
+        elif isinstance(self.random_start, (tuple, list, np.ndarray)):
+            assert self.random_start[0] <= self.random_start[1], "Random start proportion min must be less than max."
+            random_step = np.random.randint(self.random_start[0] * self.n_steps, self.random_start[1] * self.n_steps)
+        else:
+            raise NotImplementedError
+        return np.clip(random_step, 0, self.n_steps) * self.step_size
 
     def _get_initial_inventories(self) -> np.ndarray:
         if isinstance(self.initial_inventory, tuple) and len(self.initial_inventory) == 2:

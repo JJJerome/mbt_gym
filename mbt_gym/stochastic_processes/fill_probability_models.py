@@ -1,5 +1,5 @@
 import abc
-from typing import Optional
+from typing import Optional, Tuple
 
 import numpy as np
 
@@ -121,3 +121,50 @@ class PowerFillFunction(FillProbabilityModel):
 
     def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray):
         pass
+
+
+class ExogenousMmFillProbabilityModel(FillProbabilityModel):
+    def __init__(
+        self,
+        exogenous_best_depth_processes: Tuple[StochasticProcessModel],
+        fill_exponent: float = 1.5,
+        base_fill_probability: float = 1.0,
+        step_size: float = 0.1,
+        num_trajectories: int = 1,
+        seed: Optional[int] = None,
+    ):
+        assert len(exogenous_best_depth_processes) == 2, "exogenous_best_depth_processes must be length 2 (bid and ask)"
+        assert all(
+            len(process.initial_state) > 0 for process in exogenous_best_depth_processes
+        ), "Exogenous best depth processes must have a state of at least size 1."
+        self.exogenous_best_depth_processes = exogenous_best_depth_processes
+        self.fill_exponent = fill_exponent
+        self.base_fill_probability = base_fill_probability
+        super().__init__(
+            min_value=np.concatenate((process.min_value for process in self.exogenous_best_depth_processes), axis=1),
+            max_value=np.concatenate((process.max_value for process in self.exogenous_best_depth_processes), axis=1),
+            step_size=step_size,
+            terminal_time=0.0,
+            initial_state=np.concatenate(
+                (
+                    self.exogenous_best_depth_processes[0].initial_state,
+                    self.exogenous_best_depth_processes[1].initial_state,
+                ),
+                axis=1,
+            ),
+            num_trajectories=num_trajectories,
+            seed=seed,
+        )
+
+    def _get_fill_probabilities(self, depths: np.ndarray) -> np.ndarray:
+        return (depths > self.current_state) * self.base_fill_probability * np.exp(
+            -self.fill_exponent * (depths - self.current_state)
+        ) + (depths <= self.current_state)
+
+    @property
+    def max_depth(self) -> float:
+        return -np.log(0.01) / self.fill_exponent + self.exogenous_best_depth_processes[0].max_value
+
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray):
+        for process in self.exogenous_best_depth_processes:
+            process.update(arrivals, fills, actions)

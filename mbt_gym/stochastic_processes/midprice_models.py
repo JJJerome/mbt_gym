@@ -40,7 +40,7 @@ class BrownianMotionMidpriceModel(MidpriceModel):
         )
 
     def _get_max_value(self, initial_price, terminal_time):
-        return initial_price + 4 * self.volatility * terminal_time
+        return initial_price + 4 * self.volatility * np.sqrt(terminal_time)
 
 
 class GeometricBrownianMotionMidpriceModel(MidpriceModel):

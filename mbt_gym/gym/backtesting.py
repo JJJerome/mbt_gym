@@ -9,6 +9,7 @@ from mbt_gym.gym.TradingEnvironment import (
 )
 from mbt_gym.agents.Agent import Agent
 from mbt_gym.gym.helpers.generate_trajectory import generate_trajectory
+import warnings
 
 
 def get_sharpe_ratio(env: gym.Env, agent: Agent, risk_free_rate: float = 0.099):
@@ -20,9 +21,14 @@ def get_sharpe_ratio(env: gym.Env, agent: Agent, risk_free_rate: float = 0.099):
     assert env.num_trajectories == 1, "Backtesting is applied on a single trajectory"
     obs, _, _ = generate_trajectory(env, agent)
     portfolio_values = (obs[:, CASH_INDEX, :] + obs[:, INVENTORY_INDEX, :] * obs[:, ASSET_PRICE_INDEX, :]).squeeze()
+    if min(np.abs(portfolio_values)) < 1e-6:
+        warnings.warn("Runtime Warning: Division by Zero")
     return_pcts = np.diff(portfolio_values, 1)/portfolio_values[1:]
     annualized_std_returns = return_pcts.std()*np.sqrt(env.n_steps)
-    return (return_pcts.mean()*env.n_steps - risk_free_rate)/annualized_std_returns
+    return_pcts_mean = return_pcts.mean()
+    if return_pcts_mean < 0:
+        warnings.warn("Warning: Mean Return % is negative. Sharpe Ratio may not be appropriate.")
+    return (return_pcts_mean*env.n_steps - risk_free_rate)/annualized_std_returns
 
 
 def get_sortino_ratio(env:gym.Env, agent:Agent, risk_free_rate: float= 0.099):
@@ -33,10 +39,15 @@ def get_sortino_ratio(env:gym.Env, agent:Agent, risk_free_rate: float= 0.099):
     assert env.num_trajectories ==1, "Backtesting is applied on a single trajectory"
     obs, _, _ = generate_trajectory(env, agent)
     portfolio_values = (obs[:, CASH_INDEX, :] + obs[:, INVENTORY_INDEX, :] * obs[:, ASSET_PRICE_INDEX, :]).squeeze()
+    if min(np.abs(portfolio_values)) < 1e-6:
+        warnings.warn("Runtime Warning: Division by Zero")
     return_pcts = np.diff(portfolio_values, 1)/portfolio_values[1:]
     loss_pcts = return_pcts[return_pcts<0]
     annualized_std_returns = loss_pcts.std()*np.sqrt(env.n_steps)
-    return (return_pcts.mean()*env.n_steps - risk_free_rate)/annualized_std_returns
+    return_pcts_mean = return_pcts.mean()
+    if return_pcts_mean < 0: 
+        warnings.warn("Warning: Mean Return % is negative. Sortino Ratio may not be appropriate.")
+    return (return_pcts_mean*env.n_steps - risk_free_rate)/annualized_std_returns
 
 
 def get_maximum_drawdown(env:TradingEnvironment, agent:Agent):

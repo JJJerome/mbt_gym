@@ -98,6 +98,7 @@ class CarteaJaimungalMmAgent(Agent):
         self.kappa = self.env.fill_probability_model.fill_exponent
         self.max_inventory = max_inventory
         self.a_matrix, self.z_vector = self._calculate_a_and_z()
+        self.exp_a_matrix = expm(self.a_matrix)
         self.large_depth = 10_000
         self.num_trajectories = self.env.num_trajectories
 
@@ -132,7 +133,7 @@ class CarteaJaimungalMmAgent(Agent):
 
     def _calculate_omega(self, current_time: float):
         """This is Equation (10.11) from [CJP15]."""
-        return np.matmul(expm(self.a_matrix * (self.terminal_time - current_time)), self.z_vector)
+        return np.matmul(self.exp_a_matrix * np.exp(self.terminal_time - current_time), self.z_vector)
 
     def _calculate_a_and_z(self):
         matrix_size = 2 * self.max_inventory + 1

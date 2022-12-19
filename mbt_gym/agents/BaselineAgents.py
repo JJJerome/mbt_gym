@@ -89,6 +89,7 @@ class CarteaJaimungalMmAgent(Agent):
         env: TradingEnvironment = None,
         max_inventory: int = 10,
     ):
+        assert phi > 0 or alpha > 0, "Cartea Jaimungal agent only works for phi or alpha strictly positive"
         self.phi = phi
         self.alpha = alpha
         self.env = env or TradingEnvironment()

@@ -87,7 +87,7 @@ class CarteaJaimungalMmAgent(Agent):
         phi: float = 2 * 10 ** (-4),
         alpha: float = 0.0001,
         env: TradingEnvironment = None,
-        max_inventory: int = 10,
+        max_inventory: int = 100,
     ):
         self.phi = phi
         self.alpha = alpha
@@ -102,32 +102,29 @@ class CarteaJaimungalMmAgent(Agent):
         self.num_trajectories = self.env.num_trajectories
 
     def get_action(self, state: np.ndarray):
-        action = np.zeros(shape=(self.num_trajectories, 2))
-        for iq, q in enumerate(state[:, INVENTORY_INDEX]):
-            inventory = q
-            current_time = state[iq, TIME_INDEX]
-            aux_action = np.array(self._calculate_deltas(current_time, inventory))
-            action[iq, :] = aux_action[:, 0]
-        return action
+        assert (
+            state[0, TIME_INDEX] == state[-1, TIME_INDEX]
+        ), "CarteaJaimungalMmAgent needs to be called on a tensor with a uniform time stamp."
+        current_time = state[0, TIME_INDEX]
+        inventories = state[:, INVENTORY_INDEX]
+        return self._calculate_deltas(inventories=inventories, current_time=current_time)
 
-    def _calculate_deltas(self, current_time: float, inventory: int):
+    def _calculate_deltas(self, current_time: float, inventories: np.ndarray):
+        deltas = np.zeros(shape=(self.num_trajectories, 2))
         h_t = self._calculate_ht(current_time)
         # If the inventory goes above the max level, we quote a large depth to bring it back and quote on the opposite
         # side as if we had an inventory equal to sign(inventory) * self.max_inventory.
-        index = np.clip(self.max_inventory - inventory, 0, 2 * self.max_inventory)
-        index = int(index)
-        h_0 = h_t[index]
-        if inventory >= self.max_inventory:
-            delta_minus = self.large_depth
-        else:
-            h_plus_one = h_t[index - 1]
-            delta_minus = 1 / self.kappa - h_plus_one + h_0
-        if inventory <= -self.max_inventory:
-            delta_plus = self.large_depth
-        else:
-            h_minus_one = h_t[index + 1]
-            delta_plus = 1 / self.kappa - h_minus_one + h_0
-        return delta_minus, delta_plus
+        indices = np.clip(self.max_inventory - inventories, 0, 2 * self.max_inventory)
+        indices = indices.astype(int)
+        indices_minus_one = np.clip(indices - 1, 0, 2 * self.max_inventory)
+        indices_plus_one = np.clip(indices + 1, 0, 2 * self.max_inventory)
+        h_0 = h_t[indices]
+        h_plus_one = h_t[indices_plus_one]
+        h_minus_one = h_t[indices_minus_one]
+        max_inventory_loc = (h_plus_one == h_0) + (h_minus_one == h_0)
+        deltas[:, 0] = (1 / self.kappa - h_plus_one + h_0 + self.large_depth * max_inventory_loc).reshape(-1)
+        deltas[:, 1] = (1 / self.kappa - h_minus_one + h_0 + self.large_depth * max_inventory_loc).reshape(-1)
+        return deltas
 
     def _calculate_ht(self, current_time: float) -> float:
         omega_function = self._calculate_omega(current_time)

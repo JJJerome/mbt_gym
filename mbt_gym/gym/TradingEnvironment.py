@@ -7,11 +7,11 @@ import numpy as np
 from gym.spaces import Box
 
 from mbt_gym.stochastic_processes.StochasticProcessModel import StochasticProcessModel
-from mbt_gym.stochastic_processes.arrival_models import ArrivalModel, PoissonArrivalModel
-from mbt_gym.stochastic_processes.fill_probability_models import FillProbabilityModel, ExponentialFillFunction
+from mbt_gym.stochastic_processes.arrival_models import ArrivalModel
+from mbt_gym.stochastic_processes.fill_probability_models import FillProbabilityModel
 from mbt_gym.stochastic_processes.midprice_models import MidpriceModel, BrownianMotionMidpriceModel
-from mbt_gym.stochastic_processes.price_impact_models import PriceImpactModel, TemporaryPowerPriceImpact
-from mbt_gym.gym.info_calculation.InfoCalculator import InfoCalculator, ActionInfoCalculator
+from mbt_gym.stochastic_processes.price_impact_models import PriceImpactModel
+from mbt_gym.gym.info_calculators import InfoCalculator
 from mbt_gym.rewards.RewardFunctions import RewardFunction, PnL
 
 MARKET_MAKING_ACTION_TYPES = ["touch", "limit", "limit_and_market"]

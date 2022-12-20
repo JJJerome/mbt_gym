@@ -83,7 +83,7 @@ class TradingEnvironment(gym.Env):
         self.observation_space = self._get_observation_space()
         self.action_space = self._get_action_space()
         self.half_spread = half_spread
-        self.info_calculator = info_calculator or ActionInfoCalculator()
+        self.info_calculator = info_calculator
         self.empty_infos = [{} for _ in range(self.num_trajectories)] if self.num_trajectories > 1 else {}
         ones = np.ones((self.num_trajectories, 1))
         self.multiplier = np.append(-ones, ones, axis=1)
@@ -120,7 +120,11 @@ class TradingEnvironment(gym.Env):
         done = self.state[0, TIME_INDEX] >= self.terminal_time - self.step_size / 2
         dones = np.full((self.num_trajectories,), done, dtype=bool)
         rewards = self.reward_function.calculate(current_state, action, next_state, done)
-        infos = self.empty_infos
+        infos = (
+            self.info_calculator.calculate(current_state, action, rewards)
+            if self.info_calculator is not None
+            else self.empty_infos
+        )
         return self.state.copy(), rewards, dones, infos
 
     def _get_max_cash(self) -> float:

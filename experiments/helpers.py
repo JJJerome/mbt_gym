@@ -76,7 +76,7 @@ def get_ppo_learner_and_callback(
         "policy_kwargs": policy_kwargs,
         "tensorboard_log": tensorboard_logdir,
         "n_epochs": 10,
-        "batch_size": int(env.n_steps * env.num_trajectories / 3),
+        "batch_size": int(env.n_steps * env.num_trajectories / 4),
         "normalize_advantage": True,
         "n_steps": int(env.n_steps),
         "gae_lambda": 0.95,

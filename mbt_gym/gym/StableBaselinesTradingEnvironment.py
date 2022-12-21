@@ -51,9 +51,10 @@ class StableBaselinesTradingEnvironment(VecEnv):
         obs = self.normalise_observation(obs)
         if dones.min():
             if self.store_terminal_observation_info:
+                infos = infos.copy()
                 for count, info in enumerate(infos):
                     # save final observation where user can get it, then automatically reset (an SB3 convention).
-                    info["terminal_observation"] = obs[:, count]
+                    info["terminal_observation"] = obs[count, :]
             obs = self.normalise_observation(self.env.reset())
         return obs, rewards, dones, infos
 

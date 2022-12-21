@@ -125,7 +125,7 @@ class TradingEnvironment(gym.Env):
             if self.info_calculator is not None
             else self.empty_infos
         )
-        return self.state.copy(), rewards, dones, infos
+        return next_state.copy(), rewards, dones, infos
 
     def _get_max_cash(self) -> float:
         return self.max_inventory * self.max_stock_price

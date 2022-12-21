@@ -261,7 +261,7 @@ class TradingEnvironment(gym.Env):
         return Box(
             low=low,
             high=high,
-            dtype=np.float32,
+            dtype=np.float64,
         )
 
     def _get_random_start_time(self):
@@ -288,7 +288,7 @@ class TradingEnvironment(gym.Env):
         if self.action_type == "limit":
             assert self.max_depth is not None, "For limit orders max_depth cannot be NoneType"
             return gym.spaces.Box(
-                low=0.0, high=self.max_depth, shape=(2,), dtype=np.float32
+                low=0.0, high=self.max_depth, shape=(2,), dtype=np.float64
             )  # agent chooses spread on bid and ask
         if self.action_type == "limit_and_market":
             return gym.spaces.Box(
@@ -297,11 +297,11 @@ class TradingEnvironment(gym.Env):
                 ),
                 high=np.array(self.max_depth, self.max_depth, 1, 1),
                 shape=(2,),
-                dtype=np.float32,
+                dtype=np.float64,
             )
         if self.action_type == "speed":
             return gym.spaces.Box(
-                low=-self.max_speed, high=self.max_speed, shape=(1,), dtype=np.float32
+                low=-self.max_speed, high=self.max_speed, shape=(1,), dtype=np.float64
             )  # agent chooses speed of trading: positive buys, negative sells
 
     @staticmethod

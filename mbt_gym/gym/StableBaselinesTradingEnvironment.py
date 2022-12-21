@@ -9,8 +9,9 @@ from mbt_gym.gym.TradingEnvironment import TradingEnvironment
 
 
 class StableBaselinesTradingEnvironment(VecEnv):
-    def __init__(self, trading_env: TradingEnvironment):
+    def __init__(self, trading_env: TradingEnvironment, store_terminal_observation_info: bool = True):
         self.env = trading_env
+        self.store_terminal_observation_info = store_terminal_observation_info
         self.actions: np.ndarray = self.env.action_space.sample()
         super().__init__(self.env.num_trajectories, self.env.observation_space, self.env.action_space)
 
@@ -23,7 +24,11 @@ class StableBaselinesTradingEnvironment(VecEnv):
     def step_wait(self) -> VecEnvStepReturn:
         state, rewards, dones, infos = self.env.step(self.actions)
         if dones.min():
-            state = self.env.reset()  # StableBaselines VecEnvs need to automatically reset themselves.
+            if self.store_terminal_observation_info:
+                for info, count in enumerate(infos):
+                    # save final observation where user can get it, then automatically reset (an SB3 convention).
+                    info["terminal_observation"] = state[:, count]
+            state = self.env.reset()
         return state, rewards, dones, infos
 
     def close(self) -> None:

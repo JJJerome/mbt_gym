@@ -49,4 +49,4 @@ class ActionInfoCalculator(InfoCalculator):
         self.actions = self.nan_matrix.copy()
 
     def _calculate_mean_actions(self):
-        return self.actions.mean(axis=2)
+        return self.actions.nanmean(axis=2)

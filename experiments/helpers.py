@@ -136,9 +136,9 @@ def create_inventory_plot(
     plt.plot(inventories, ask_actions, label="ask", color="r")
     plt.plot(inventories, cj_bid_actions, label="bid cj", color="k", linestyle="--")
     plt.plot(inventories, cj_ask_actions, label="ask cj", color="r", linestyle="--")
-    plt.title(get_experiment_string(env))
     plt.legend()
     if save_figure:
+        plt.title(get_experiment_string(env))
         plt.savefig(path_to_figures + "/inventory_plots/" + get_experiment_string(env) + ".pdf")
     else:
         plt.show()
@@ -160,10 +160,10 @@ def create_time_plot(
     times = np.arange(0, env.terminal_time + 0.01, 0.01)
     inventory_dict = {inventory: [] for inventory in inventories}
     action_dict = {
-        "rl bid actions": inventory_dict,
-        "cj bid actions": inventory_dict,
-        "rl ask actions": inventory_dict,
-        "cj ask actions": inventory_dict,
+        "rl bid actions": deepcopy(inventory_dict),
+        "cj bid actions": deepcopy(inventory_dict),
+        "rl ask actions": deepcopy(inventory_dict),
+        "cj ask actions": deepcopy(inventory_dict),
     }
     for inventory in inventories:
         for time in times:

@@ -114,6 +114,7 @@ def create_inventory_plot(
     min_inventory: int = -3,
     max_inventory: int = 3,
     time_of_action: float = 0.5,
+    save_figure: bool = False,
     path_to_figures: str = "./figures",
 ):
     ppo_agent = SbAgent(model)
@@ -133,7 +134,10 @@ def create_inventory_plot(
     plt.plot(inventories, cj_ask_actions, label="ask cj", color="r", linestyle="--")
     plt.title(get_experiment_string(env))
     plt.legend()
-    plt.savefig(path_to_figures + "/inventory_plots/" + get_experiment_string(env) + ".pdf")
+    if save_figure:
+        plt.savefig(path_to_figures + "/inventory_plots/" + get_experiment_string(env) + ".pdf")
+    else:
+        plt.show()
 
 
 def create_time_plot(
@@ -141,6 +145,7 @@ def create_time_plot(
     env: TradingEnvironment,
     min_inventory: int = -2,
     max_inventory: int = 2,
+    save_figure:bool = False,
     path_to_figures: str = "./figures",
 ):
     ppo_agent = SbAgent(model)
@@ -168,4 +173,7 @@ def create_time_plot(
             axs[count // 2, count % 2].plot(times, actions[inventory], label=f"inventory = {inventory}")
             axs[count // 2, count % 2].legend()
     fig.tight_layout()
-    plt.savefig(path_to_figures + "/time_plots/" + get_experiment_string(env) + ".pdf")
+    if save_figure:
+        plt.savefig(path_to_figures + "/time_plots/" + get_experiment_string(env) + ".pdf")
+    else:
+        plt.show()

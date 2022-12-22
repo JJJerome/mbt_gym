@@ -33,7 +33,7 @@ for arrival_rate in arrival_rates:
         model, callback = get_ppo_learner_and_callback(env)
         model.learn(total_timesteps=300_000_000, callback=callback)
         model.save(final_model_path + "/" + get_experiment_string(env))
-        create_inventory_plot(model=model, env=env)
-        create_time_plot(model=model, env=env)
+        create_inventory_plot(model=model, env=env, save_figure=True)
+        create_time_plot(model=model, env=env, save_figure=True)
 
 

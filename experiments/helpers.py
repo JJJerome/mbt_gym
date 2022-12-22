@@ -118,9 +118,10 @@ def create_inventory_plot(
     save_figure: bool = False,
     path_to_figures: str = "./figures",
 ):
+    assert env.num_trajectories == 1, "Plotting actions must be done with a single trajectory env"
     ppo_agent = SbAgent(model)
     cj_agent = CarteaJaimungalMmAgent(env=env)
-    inventories = np.arange(-min_inventory, max_inventory + 1, 1)
+    inventories = np.arange(min_inventory, max_inventory + 1, 1)
     bid_actions, ask_actions, cj_bid_actions, cj_ask_actions = [], [], [], []
     for inventory in inventories:
         state = np.array([[0, inventory, time_of_action, 100]])
@@ -152,9 +153,10 @@ def create_time_plot(
     save_figure: bool = False,
     path_to_figures: str = "./figures",
 ):
+    assert env.num_trajectories == 1, "Plotting actions must be done with a single trajectory env"
     ppo_agent = SbAgent(model)
     cj_agent = CarteaJaimungalMmAgent(env=env, max_inventory=5 * max_inventory)
-    inventories = np.arange(-min_inventory, max_inventory + 1, 1)
+    inventories = np.arange(min_inventory, max_inventory + 1, 1)
     times = np.arange(0, env.terminal_time + 0.01, 0.01)
     inventory_dict = {inventory: [] for inventory in inventories}
     action_dict = {

@@ -120,7 +120,7 @@ def create_inventory_plot(
     path_to_figures: str = "./figures",
 ):
     if model_uses_normalisation:
-        normalised_env = StableBaselinesTradingEnvironment(trading_env=env)
+        normalised_env = StableBaselinesTradingEnvironment(ReduceStateSizeWrapper(env, reduced_training_indices))
     assert env.num_trajectories == 1, "Plotting actions must be done with a single trajectory env"
     ppo_agent = SbAgent(model)
     cj_agent = CarteaJaimungalMmAgent(env=env)
@@ -163,7 +163,7 @@ def create_time_plot(
     path_to_figures: str = "./figures",
 ):
     if model_uses_normalisation:
-        normalised_env = StableBaselinesTradingEnvironment(trading_env=env)
+        normalised_env = StableBaselinesTradingEnvironment(ReduceStateSizeWrapper(env, reduced_training_indices))
     assert env.num_trajectories == 1, "Plotting actions must be done with a single trajectory env"
     ppo_agent = SbAgent(model)
     cj_agent = CarteaJaimungalMmAgent(env=env, max_inventory=5 * max_inventory)

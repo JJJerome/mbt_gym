@@ -114,10 +114,13 @@ def create_inventory_plot(
     min_inventory: int = -3,
     max_inventory: int = 3,
     reduced_training_indices: list = None,
+    model_uses_normalisation: bool = True,
     time_of_action: float = 0.5,
     save_figure: bool = False,
     path_to_figures: str = "./figures",
 ):
+    if model_uses_normalisation:
+        normalised_env = StableBaselinesTradingEnvironment(trading_env=env)
     assert env.num_trajectories == 1, "Plotting actions must be done with a single trajectory env"
     ppo_agent = SbAgent(model)
     cj_agent = CarteaJaimungalMmAgent(env=env)
@@ -126,7 +129,12 @@ def create_inventory_plot(
     for inventory in inventories:
         state = np.array([[0, inventory, time_of_action, 100]])
         reduced_state = state[:, reduced_training_indices] if reduced_training_indices is not None else state
-        bid_action, ask_action = ppo_agent.get_action(reduced_state)
+        if model_uses_normalisation:
+            reduced_state = normalised_env.normalise_observation(reduced_state)
+        action = ppo_agent.get_action(reduced_state)
+        if model_uses_normalisation:
+            action = normalised_env.normalise_action(action, inverse=True)
+        bid_action, ask_action = action
         cj_bid_action, cj_ask_action = cj_agent.get_action(state).reshape(-1)
         bid_actions.append(bid_action)
         ask_actions.append(ask_action)
@@ -150,9 +158,12 @@ def create_time_plot(
     min_inventory: int = -2,
     max_inventory: int = 2,
     reduced_training_indices: list = None,
+    model_uses_normalisation: bool = True,
     save_figure: bool = False,
     path_to_figures: str = "./figures",
 ):
+    if model_uses_normalisation:
+        normalised_env = StableBaselinesTradingEnvironment(trading_env=env)
     assert env.num_trajectories == 1, "Plotting actions must be done with a single trajectory env"
     ppo_agent = SbAgent(model)
     cj_agent = CarteaJaimungalMmAgent(env=env, max_inventory=5 * max_inventory)
@@ -169,9 +180,15 @@ def create_time_plot(
         for time in times:
             state = np.array([[0, inventory, time, 100]])
             reduced_state = state[:, reduced_training_indices] if reduced_training_indices is not None else state
-            action_dict["rl bid actions"][inventory].append(ppo_agent.get_action(reduced_state)[0])
+            if model_uses_normalisation:
+                reduced_state = normalised_env.normalise_observation(reduced_state)
+            action = ppo_agent.get_action(reduced_state)
+            if model_uses_normalisation:
+                action = normalised_env.normalise_action(action, inverse=True)
+            bid_action, ask_action = action
+            action_dict["rl bid actions"][inventory].append(bid_action)
+            action_dict["rl ask actions"][inventory].append(ask_action)
             action_dict["cj bid actions"][inventory].append(cj_agent.get_action(state)[:, 0].item())
-            action_dict["rl ask actions"][inventory].append(ppo_agent.get_action(reduced_state)[1])
             action_dict["cj ask actions"][inventory].append(cj_agent.get_action(state)[:, 1].item())
     fig, axs = plt.subplots(2, 2, figsize=(15, 10))
     for count, (name, actions) in enumerate(action_dict.items()):

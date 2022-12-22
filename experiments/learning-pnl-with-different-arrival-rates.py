@@ -1,8 +1,14 @@
 import sys
+
 sys.path.append("../")
 
-from experiments.helpers import get_cj_env, get_ppo_learner_and_callback, get_experiment_string, create_time_plot, \
-    create_inventory_plot
+from experiments.helpers import (
+    get_cj_env,
+    get_ppo_learner_and_callback,
+    get_experiment_string,
+    create_time_plot,
+    create_inventory_plot,
+)
 
 num_trajectories = 1000
 terminal_time = 1.0
@@ -35,5 +41,3 @@ for arrival_rate in arrival_rates:
         model.save(final_model_path + "/" + get_experiment_string(env))
         create_inventory_plot(model=model, env=env, save_figure=True)
         create_time_plot(model=model, env=env, save_figure=True)
-
-

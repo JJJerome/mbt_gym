@@ -113,6 +113,7 @@ def create_inventory_plot(
     env: TradingEnvironment,
     min_inventory: int = -3,
     max_inventory: int = 3,
+    reduced_training_indices: list = None,
     time_of_action: float = 0.5,
     save_figure: bool = False,
     path_to_figures: str = "./figures",
@@ -122,8 +123,10 @@ def create_inventory_plot(
     inventories = np.arange(-min_inventory, max_inventory + 1, 1)
     bid_actions, ask_actions, cj_bid_actions, cj_ask_actions = [], [], [], []
     for inventory in inventories:
-        bid_action, ask_action = ppo_agent.get_action(np.array([[inventory, time_of_action]]))
-        cj_bid_action, cj_ask_action = cj_agent.get_action(np.array([[0, inventory, time_of_action]])).reshape(-1)
+        state = np.array([[0, inventory, time_of_action, 100]])
+        reduced_state = state[:, reduced_training_indices] if reduced_training_indices is not None else state
+        bid_action, ask_action = ppo_agent.get_action(reduced_state)
+        cj_bid_action, cj_ask_action = cj_agent.get_action(state).reshape(-1)
         bid_actions.append(bid_action)
         ask_actions.append(ask_action)
         cj_bid_actions.append(cj_bid_action)
@@ -145,27 +148,29 @@ def create_time_plot(
     env: TradingEnvironment,
     min_inventory: int = -2,
     max_inventory: int = 2,
-    save_figure:bool = False,
+    reduced_training_indices: list = None,
+    save_figure: bool = False,
     path_to_figures: str = "./figures",
 ):
     ppo_agent = SbAgent(model)
     cj_agent = CarteaJaimungalMmAgent(env=env, max_inventory=5 * max_inventory)
     inventories = np.arange(-min_inventory, max_inventory + 1, 1)
     times = np.arange(0, env.terminal_time + 0.01, 0.01)
-    action_dict = {"rl bid actions": {}, "cj bid actions": {}, "rl ask actions": {}, "cj ask actions": {}}
+    inventory_dict = {inventory: [] for inventory in inventories}
+    action_dict = {
+        "rl bid actions": inventory_dict,
+        "cj bid actions": inventory_dict,
+        "rl ask actions": inventory_dict,
+        "cj ask actions": inventory_dict,
+    }
     for inventory in inventories:
-        action_dict["rl bid actions"][inventory] = [
-            ppo_agent.get_action(np.array([[0, inventory, time, 100]]))[0] for time in times
-        ]
-        action_dict["cj bid actions"][inventory] = [
-            cj_agent.get_action(np.array([[0, inventory, time, 100]]))[:, 0].item() for time in times
-        ]
-        action_dict["rl ask actions"][inventory] = [
-            ppo_agent.get_action(np.array([[0, inventory, time, 100]]))[1] for time in times
-        ]
-        action_dict["cj ask actions"][inventory] = [
-            cj_agent.get_action(np.array([[0, inventory, time, 100]]))[:, 1].item() for time in times
-        ]
+        for time in times:
+            state = np.array([[0, inventory, time, 100]])
+            reduced_state = state[:, reduced_training_indices] if reduced_training_indices is not None else state
+            action_dict["rl bid actions"][inventory].append(ppo_agent.get_action(reduced_state)[0])
+            action_dict["cj bid actions"][inventory].append(cj_agent.get_action(state)[:, 0].item())
+            action_dict["rl ask actions"][inventory].append(ppo_agent.get_action(reduced_state)[1])
+            action_dict["cj ask actions"][inventory].append(cj_agent.get_action(state)[:, 1].item())
     fig, axs = plt.subplots(2, 2, figsize=(15, 10))
     for count, (name, actions) in enumerate(action_dict.items()):
         axs[count // 2, count % 2].set_title(name, fontsize=20)

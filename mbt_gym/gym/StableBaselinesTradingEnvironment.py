@@ -25,16 +25,16 @@ class StableBaselinesTradingEnvironment(VecEnv):
         if self.normalise_action_space:
             # We just do a linear normalisation of the gym.Box space so that the domain of the action space is [-1,1].
             action_space = gym.spaces.Box(
-                low=-np.ones_like(self.env.action_space.low), high=np.ones_like(self.env.action_space.high),
-                dtype=np.float32
+                low=-np.ones_like(self.env.action_space.low, dtype=np.float32),
+                high=np.ones_like(self.env.action_space.high, dtype=np.float32),
             )
         else:
             action_space = self.env.action_space
         if self.normalise_observation_space:
             # Linear normalisation of the gym.Box space so that the domain of the observation space is [-1,1].
             observation_space = gym.spaces.Box(
-                low=-np.ones_like(self.env.observation_space.low), high=np.ones_like(self.env.observation_space.high),
-                dtype=np.float32
+                low=-np.ones_like(self.env.observation_space.low, dtype=np.float32),
+                high=np.ones_like(self.env.observation_space.high, dtype=np.float32),
             )
         else:
             observation_space = self.env.observation_space

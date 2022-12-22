@@ -258,11 +258,7 @@ class TradingEnvironment(gym.Env):
         for process in self.stochastic_processes.values():
             low = np.append(low, process.min_value)
             high = np.append(high, process.max_value)
-        return Box(
-            low=low,
-            high=high,
-            dtype=np.float32,
-        )
+        return Box(low=np.float32(low), high=np.float32(high))
 
     def _get_random_start_time(self):
         if isinstance(self.random_start, (float, int)):
@@ -287,22 +283,16 @@ class TradingEnvironment(gym.Env):
             return gym.spaces.MultiBinary(2)  # agent chooses spread on bid and ask
         if self.action_type == "limit":
             assert self.max_depth is not None, "For limit orders max_depth cannot be NoneType"
-            return gym.spaces.Box(
-                low=0.0, high=self.max_depth, shape=(2,), dtype=np.float32
-            )  # agent chooses spread on bid and ask
+            # agent chooses spread on bid and ask
+            return gym.spaces.Box(low=np.float32(0.0), high=np.float32(self.max_depth), shape=(2,))
         if self.action_type == "limit_and_market":
             return gym.spaces.Box(
-                low=np.zeros(
-                    4,
-                ),
-                high=np.array(self.max_depth, self.max_depth, 1, 1),
-                shape=(2,),
-                dtype=np.float32,
+                low=np.zeros(4),
+                high=np.array([self.max_depth, self.max_depth, 1, 1], dtype=np.float32),
             )
         if self.action_type == "speed":
-            return gym.spaces.Box(
-                low=-self.max_speed, high=self.max_speed, shape=(1,), dtype=np.float32
-            )  # agent chooses speed of trading: positive buys, negative sells
+            # agent chooses speed of trading: positive buys, negative sells
+            return gym.spaces.Box(low=np.float32([-self.max_speed]), high=np.float32([self.max_speed]))
 
     @staticmethod
     def _clamp(probability):

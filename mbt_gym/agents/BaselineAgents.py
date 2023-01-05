@@ -6,7 +6,7 @@ import warnings
 from scipy.linalg import expm
 
 from mbt_gym.agents.Agent import Agent
-from mbt_gym.gym.TradingEnvironment import TradingEnvironment, INVENTORY_INDEX, TIME_INDEX
+from mbt_gym.gym.TradingEnvironment import TradingEnvironment, INVENTORY_INDEX, TIME_INDEX, BID_INDEX, ASK_INDEX
 from mbt_gym.rewards.RewardFunctions import CjMmCriterion, PnL
 from mbt_gym.stochastic_processes.price_impact_models import PriceImpactModel, TemporaryAndPermanentPriceImpact
 
@@ -123,16 +123,17 @@ class CarteaJaimungalMmAgent(Agent):
         h_t = self._calculate_ht(current_time)
         # If the inventory goes above the max level, we quote a large depth to bring it back and quote on the opposite
         # side as if we had an inventory equal to sign(inventory) * self.max_inventory.
-        indices = np.clip(self.max_inventory - inventories, 0, 2 * self.max_inventory)
+        indices = np.clip(self.max_inventory + inventories, 0, 2 * self.max_inventory)
         indices = indices.astype(int)
         indices_minus_one = np.clip(indices - 1, 0, 2 * self.max_inventory)
         indices_plus_one = np.clip(indices + 1, 0, 2 * self.max_inventory)
         h_0 = h_t[indices]
         h_plus_one = h_t[indices_plus_one]
         h_minus_one = h_t[indices_minus_one]
-        max_inventory_loc = (h_plus_one == h_0) + (h_minus_one == h_0)
-        deltas[:, 0] = (1 / self.kappa - h_plus_one + h_0 + self.large_depth * max_inventory_loc).reshape(-1)
-        deltas[:, 1] = (1 / self.kappa - h_minus_one + h_0 + self.large_depth * max_inventory_loc).reshape(-1)
+        max_inventory_bid = (h_plus_one == h_0) 
+        max_inventory_ask = (h_minus_one == h_0)
+        deltas[:, BID_INDEX] = (1 / self.kappa - h_plus_one + h_0 + self.large_depth * max_inventory_bid).reshape(-1)
+        deltas[:, ASK_INDEX] = (1 / self.kappa - h_minus_one + h_0 + self.large_depth * max_inventory_ask).reshape(-1)
         return deltas
 
     def _calculate_ht(self, current_time: float) -> float:

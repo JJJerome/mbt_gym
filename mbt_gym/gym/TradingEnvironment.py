@@ -227,7 +227,7 @@ class TradingEnvironment(gym.Env):
         clipped = np.clip(not_clipped, min, max)
         if (not_clipped != clipped).any() and cash_flag:
             print(f"Clipping agent's cash from {not_clipped} to {clipped}.")
-        if (not_clipped != clipped).any() and ~cash_flag:
+        if (not_clipped != clipped).any() and not cash_flag:
             print(f"Clipping agent's inventory from {not_clipped} to {clipped}.")
         return clipped
 

@@ -149,7 +149,22 @@ class TradingEnvironment(gym.Env):
             fills = self.fill_probability_model.get_fills(depths)
         elif self.action_type == "touch":
             fills = self.post_at_touch(action)
+        fills = self.remove_max_inventory_fills(fills)
         return arrivals, fills
+
+    def remove_max_inventory_fills(self, fills: np.ndarray) -> np.ndarray:
+        fill_multiplier = np.concatenate(
+            ((1 - self.is_at_max_inventory).reshape(-1, 1), (1 - self.is_at_min_inventory).reshape(-1, 1)), axis=1
+        )
+        return fill_multiplier * fills
+
+    @property
+    def is_at_max_inventory(self):
+        return self.state[:, INVENTORY_INDEX] >= self.max_inventory
+
+    @property
+    def is_at_min_inventory(self):
+        return self.state[:, INVENTORY_INDEX] <= -self.max_inventory
 
     # The action space depends on the action_type but bids always precede asks for limit and market order actions.
     # state[0]=cash, state[1]=inventory, state[2]=time, state[3] = asset_price, and then remaining states depend on
@@ -178,7 +193,7 @@ class TradingEnvironment(gym.Env):
             best_ask = self.midprice + self.half_spread
             self.state[:, CASH_INDEX] += mo_sell * best_bid - mo_buy * best_ask
             self.state[:, INVENTORY_INDEX] += mo_buy - mo_sell
-        if self.action_type == "touch":
+        elif self.action_type == "touch":
             self.state[:, CASH_INDEX] += np.sum(
                 self.multiplier * arrivals * fills * (self.midprice + self.half_spread * self.multiplier), axis=1
             )
@@ -203,8 +218,10 @@ class TradingEnvironment(gym.Env):
         return self.midprice_model.current_state[:, 0].reshape(-1, 1)
 
     def _clip_inventory_and_cash(self):
-        self.state[:, 1] = self._clip(self.state[:, 1], -self.max_inventory, self.max_inventory, cash_flag=False)
-        self.state[:, 0] = self._clip(self.state[:, 0], -self.max_cash, self.max_cash, cash_flag=True)
+        self.state[:, INVENTORY_INDEX] = self._clip(
+            self.state[:, INVENTORY_INDEX], -self.max_inventory, self.max_inventory, cash_flag=False
+        )
+        self.state[:, CASH_INDEX] = self._clip(self.state[:, CASH_INDEX], -self.max_cash, self.max_cash, cash_flag=True)
 
     def _clip(self, not_clipped: float, min: float, max: float, cash_flag: bool) -> float:
         clipped = np.clip(not_clipped, min, max)

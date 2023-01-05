@@ -155,8 +155,8 @@ def create_inventory_plot(
 def create_time_plot(
     model: PPO,
     env: TradingEnvironment,
-    min_inventory: int = -2,
-    max_inventory: int = 2,
+    min_inventory: int = -3,
+    max_inventory: int = 3,
     reduced_training_indices: list = None,
     model_uses_normalisation: bool = True,
     save_figure: bool = False,
@@ -166,7 +166,7 @@ def create_time_plot(
         normalised_env = StableBaselinesTradingEnvironment(ReduceStateSizeWrapper(env, reduced_training_indices))
     assert env.num_trajectories == 1, "Plotting actions must be done with a single trajectory env"
     ppo_agent = SbAgent(model)
-    cj_agent = CarteaJaimungalMmAgent(env=env, max_inventory=5 * max_inventory)
+    cj_agent = CarteaJaimungalMmAgent(env=env, max_inventory = max_inventory)
     inventories = np.arange(min_inventory, max_inventory + 1, 1)
     times = np.arange(0, env.terminal_time + 0.01, 0.01)
     inventory_dict = {inventory: [] for inventory in inventories}

@@ -7,6 +7,8 @@ from stable_baselines3.common.vec_env import VecEnv
 from stable_baselines3.common.vec_env.base_vec_env import VecEnvObs, VecEnvStepReturn, VecEnvIndices
 
 from mbt_gym.gym.TradingEnvironment import TradingEnvironment
+from mbt_gym.stochastic_processes.arrival_models import PoissonArrivalModel
+from mbt_gym.stochastic_processes.fill_probability_models import ExponentialFillFunction
 
 
 class StableBaselinesTradingEnvironment(VecEnv):
@@ -16,11 +18,13 @@ class StableBaselinesTradingEnvironment(VecEnv):
         store_terminal_observation_info: bool = True,
         normalise_action_space: bool = True,
         normalise_observation_space: bool = True,
+        normalise_rewards: bool = False,
     ):
         self.env = trading_env
         self.store_terminal_observation_info = store_terminal_observation_info
         self.normalise_action_space = normalise_action_space
         self.normalise_observation_space = normalise_observation_space
+        self.normalise_rewards_ = normalise_rewards
         self.actions: np.ndarray = self.env.action_space.sample()
         if self.normalise_action_space:
             # We just do a linear normalisation of the gym.Box space so that the domain of the action space is [-1,1].
@@ -39,6 +43,12 @@ class StableBaselinesTradingEnvironment(VecEnv):
         else:
             observation_space = self.env.observation_space
         super().__init__(self.env.num_trajectories, observation_space, action_space)
+        if self.normalise_rewards_:
+            assert isinstance(self.env.arrival_model, PoissonArrivalModel) and isinstance(
+                self.env.fill_probability_model, ExponentialFillFunction
+            ), "Arrival model must be Poisson and fill probability model must be exponential to scale rewards"
+            self.reward_offset = -1
+            self.reward_scaling = 2 / self.get_max_risk_neutral_rewards()
 
     def reset(self) -> VecEnvObs:
         return self.normalise_observation(self.env.reset())
@@ -49,6 +59,7 @@ class StableBaselinesTradingEnvironment(VecEnv):
     def step_wait(self) -> VecEnvStepReturn:
         obs, rewards, dones, infos = self.env.step(self.actions)
         obs = self.normalise_observation(obs)
+        rewards = self.normalise_rewards(rewards)
         if dones.min():
             if self.store_terminal_observation_info:
                 infos = infos.copy()
@@ -95,6 +106,9 @@ class StableBaselinesTradingEnvironment(VecEnv):
         else:
             return action
 
+    def normalise_rewards(self, rewards: np.ndarray):
+        return self.reward_offset + self.reward_scaling * rewards if self.normalise_rewards_ else rewards
+
     @property
     def linear_intercept_obs(self):
         return self.env.observation_space.low
@@ -110,3 +124,6 @@ class StableBaselinesTradingEnvironment(VecEnv):
     @property
     def linear_gradient_action(self):
         return (self.env.action_space.high - self.env.action_space.low) / 2
+
+    def get_max_risk_neutral_rewards(self):
+        return np.sum(self.env.arrival_model.intensity * self.env.fill_probability_model.fill_exponent * np.exp(-1))

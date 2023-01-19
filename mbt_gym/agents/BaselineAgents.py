@@ -22,7 +22,7 @@ class RandomAgent(Agent):
 
 
 class FixedActionAgent(Agent):
-    def __init__(self, fixed_action: tuple, env: gym.Env):
+    def __init__(self, fixed_action: np.ndarray, env: gym.Env):
         self.fixed_action = fixed_action
         self.env = env
 
@@ -130,8 +130,8 @@ class CarteaJaimungalMmAgent(Agent):
         h_0 = h_t[indices]
         h_plus_one = h_t[indices_plus_one]
         h_minus_one = h_t[indices_minus_one]
-        max_inventory_bid = (h_plus_one == h_0) 
-        max_inventory_ask = (h_minus_one == h_0)
+        max_inventory_bid = h_plus_one == h_0
+        max_inventory_ask = h_minus_one == h_0
         deltas[:, BID_INDEX] = (1 / self.kappa - h_plus_one + h_0 + self.large_depth * max_inventory_bid).reshape(-1)
         deltas[:, ASK_INDEX] = (1 / self.kappa - h_minus_one + h_0 + self.large_depth * max_inventory_ask).reshape(-1)
         return deltas

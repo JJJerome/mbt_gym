@@ -6,7 +6,9 @@ import numpy as np
 from stable_baselines3.common.vec_env import VecEnv
 from stable_baselines3.common.vec_env.base_vec_env import VecEnvObs, VecEnvStepReturn, VecEnvIndices
 
+from mbt_gym.agents.BaselineAgents import FixedActionAgent
 from mbt_gym.gym.TradingEnvironment import TradingEnvironment
+from mbt_gym.gym.helpers.generate_trajectory import generate_trajectory
 from mbt_gym.stochastic_processes.arrival_models import PoissonArrivalModel
 from mbt_gym.stochastic_processes.fill_probability_models import ExponentialFillFunction
 
@@ -48,7 +50,7 @@ class StableBaselinesTradingEnvironment(VecEnv):
                 self.env.fill_probability_model, ExponentialFillFunction
             ), "Arrival model must be Poisson and fill probability model must be exponential to scale rewards"
             self.reward_offset = -1
-            self.reward_scaling = 2 / self.get_max_risk_neutral_rewards()
+            self.reward_scaling = 2 / self.get_risk_neutral_policy_rewards()
 
     def reset(self) -> VecEnvObs:
         return self.normalise_observation(self.env.reset())
@@ -125,5 +127,13 @@ class StableBaselinesTradingEnvironment(VecEnv):
     def linear_gradient_action(self):
         return (self.env.action_space.high - self.env.action_space.low) / 2
 
-    def get_max_risk_neutral_rewards(self):
-        return np.sum(self.env.arrival_model.intensity * self.env.fill_probability_model.fill_exponent * np.exp(-1))
+    def get_risk_neutral_policy_rewards(self):
+        fixed_action = 1/self.env.fill_probability_model.fill_exponent
+        fixed_agent = FixedActionAgent(fixed_action=np.array([fixed_action, fixed_action]), env=self.env)
+        trajectory_rewards = []
+        num_trajectories = int(100_000 / self.env.num_trajectories)
+        for _ in range(num_trajectories):
+            _, _ , rewards = generate_trajectory(self.env, fixed_agent)
+            trajectory_rewards.append(np.mean(np.sum(rewards, axis = -1)))
+        mean_rewards = np.mean(trajectory_rewards)
+        return mean_rewards

@@ -137,3 +137,7 @@ class StableBaselinesTradingEnvironment(VecEnv):
             trajectory_rewards.append(np.mean(np.sum(rewards, axis = -1)))
         mean_rewards = np.mean(trajectory_rewards)
         return mean_rewards
+
+    @property
+    def num_trajectories(self):
+        return self.env.num_trajectories

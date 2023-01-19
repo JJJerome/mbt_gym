@@ -49,7 +49,7 @@ class StableBaselinesTradingEnvironment(VecEnv):
             assert isinstance(self.env.arrival_model, PoissonArrivalModel) and isinstance(
                 self.env.fill_probability_model, ExponentialFillFunction
             ), "Arrival model must be Poisson and fill probability model must be exponential to scale rewards"
-            self.reward_offset = -1
+            self.reward_offset = -1 /self.env.n_steps
             self.reward_scaling = 2 / self.get_risk_neutral_policy_rewards()
 
     def reset(self) -> VecEnvObs:
@@ -109,7 +109,7 @@ class StableBaselinesTradingEnvironment(VecEnv):
             return action
 
     def normalise_rewards(self, rewards: np.ndarray):
-        return self.reward_offset + self.reward_scaling * rewards if self.normalise_rewards_ else rewards
+        return self.reward_offset + (self.reward_scaling * rewards) if self.normalise_rewards_ else rewards
 
     @property
     def linear_intercept_obs(self):
@@ -128,13 +128,13 @@ class StableBaselinesTradingEnvironment(VecEnv):
         return (self.env.action_space.high - self.env.action_space.low) / 2
 
     def get_risk_neutral_policy_rewards(self):
-        fixed_action = 1/self.env.fill_probability_model.fill_exponent
+        fixed_action = 1 / self.env.fill_probability_model.fill_exponent
         fixed_agent = FixedActionAgent(fixed_action=np.array([fixed_action, fixed_action]), env=self.env)
         trajectory_rewards = []
         num_trajectories = int(100_000 / self.env.num_trajectories)
         for _ in range(num_trajectories):
-            _, _ , rewards = generate_trajectory(self.env, fixed_agent)
-            trajectory_rewards.append(np.mean(np.sum(rewards, axis = -1)))
+            _, _, rewards = generate_trajectory(self.env, fixed_agent)
+            trajectory_rewards.append(np.mean(np.sum(rewards, axis=-1)))
         mean_rewards = np.mean(trajectory_rewards)
         return mean_rewards
 

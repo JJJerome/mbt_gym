@@ -130,9 +130,11 @@ class StableBaselinesTradingEnvironment(VecEnv):
         fixed_action = 1 / self.env.fill_probability_model.fill_exponent
         fixed_agent = FixedActionAgent(fixed_action=np.array([fixed_action, fixed_action]), env=self.env)
         trajectory_rewards = []
+        full_trajectory_env = deepcopy(self.env)
+        full_trajectory_env.random_start = None
         num_trajectories = int(100_000 / self.env.num_trajectories)
         for _ in range(num_trajectories):
-            _, _, rewards = generate_trajectory(self.env, fixed_agent)
+            _, _, rewards = generate_trajectory(full_trajectory_env, fixed_agent)
             trajectory_rewards.append(np.mean(np.sum(rewards, axis=-1)))
         mean_rewards = np.mean(trajectory_rewards)
         return mean_rewards

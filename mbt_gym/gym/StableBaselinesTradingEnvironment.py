@@ -141,3 +141,7 @@ class StableBaselinesTradingEnvironment(VecEnv):
     @property
     def num_trajectories(self):
         return self.env.num_trajectories
+
+    @property
+    def n_steps(self):
+        return self.env.n_steps

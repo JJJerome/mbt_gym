@@ -49,8 +49,7 @@ class StableBaselinesTradingEnvironment(VecEnv):
             assert isinstance(self.env.arrival_model, PoissonArrivalModel) and isinstance(
                 self.env.fill_probability_model, ExponentialFillFunction
             ), "Arrival model must be Poisson and fill probability model must be exponential to scale rewards"
-            self.reward_offset = -1 /self.env.n_steps
-            self.reward_scaling = 2 / self.get_risk_neutral_policy_rewards()
+            self.reward_scaling = 1 / self.get_risk_neutral_policy_rewards()
 
     def reset(self) -> VecEnvObs:
         return self.normalise_observation(self.env.reset())
@@ -109,7 +108,7 @@ class StableBaselinesTradingEnvironment(VecEnv):
             return action
 
     def normalise_rewards(self, rewards: np.ndarray):
-        return self.reward_offset + (self.reward_scaling * rewards) if self.normalise_rewards_ else rewards
+        return self.reward_scaling * rewards if self.normalise_rewards_ else rewards
 
     @property
     def linear_intercept_obs(self):

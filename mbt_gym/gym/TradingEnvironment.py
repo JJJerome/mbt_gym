@@ -5,6 +5,7 @@ import gym
 import numpy as np
 
 from gym.spaces import Box
+from scipy.stats._distn_infrastructure import rv_continuous_frozen, rv_discrete_frozen
 
 from mbt_gym.stochastic_processes.StochasticProcessModel import StochasticProcessModel
 from mbt_gym.stochastic_processes.arrival_models import ArrivalModel
@@ -48,7 +49,7 @@ class TradingEnvironment(gym.Env):
         max_depth: float = None,
         max_speed: float = None,
         half_spread: float = None,
-        random_start: Union[float, int, tuple, list] = None,  # The minimum and the maximum random start of the ...
+        random_start: Union[float, int, tuple, list, rv_discrete_frozen, rv_continuous_frozen] = None,
         info_calculator: InfoCalculator = None,  # episode given as a proportion.
         seed: int = None,
         num_trajectories: int = 1,
@@ -286,6 +287,8 @@ class TradingEnvironment(gym.Env):
         elif isinstance(self.random_start, (tuple, list, np.ndarray)):
             assert self.random_start[0] <= self.random_start[1], "Random start proportion min must be less than max."
             random_step = np.random.randint(self.random_start[0] * self.n_steps, self.random_start[1] * self.n_steps)
+        elif isinstance(self.random_start, (rv_continuous_frozen, rv_discrete_frozen)):
+            return self.random_start.rvs()
         else:
             raise NotImplementedError
         return np.clip(random_step, 0, self.n_steps) * self.step_size

@@ -209,7 +209,7 @@ class TradingEnvironment(gym.Env):
             )
         if self.action_type in EXECUTION_ACTION_TYPES:
             price_impact = self.price_impact_model.get_impact(action)
-            execution_price = self.midprice[0] + price_impact
+            execution_price = self.midprice + price_impact
             volume = action * self.step_size
             self.state[:, CASH_INDEX] -= np.squeeze(volume * execution_price)
             self.state[:, INVENTORY_INDEX] += np.squeeze(volume)

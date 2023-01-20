@@ -1,5 +1,6 @@
 from collections import OrderedDict
-from typing import Union, Tuple
+from types import NoneType
+from typing import Union, Tuple, Callable
 
 import gym
 import numpy as np
@@ -49,7 +50,7 @@ class TradingEnvironment(gym.Env):
         max_depth: float = None,
         max_speed: float = None,
         half_spread: float = None,
-        random_start: Union[float, int, tuple, list, rv_discrete_frozen, rv_continuous_frozen] = None,
+        random_start: Union[float, int, tuple, list, rv_discrete_frozen, rv_continuous_frozen, Callable] = None,
         info_calculator: InfoCalculator = None,  # episode given as a proportion.
         seed: int = None,
         num_trajectories: int = 1,
@@ -113,6 +114,7 @@ class TradingEnvironment(gym.Env):
         for process in self.stochastic_processes.values():
             process.reset()
         self.state = self.initial_state
+        self._set_step_size(self.state[0, TIME_INDEX])
         self.reward_function.reset(self.state.copy())
         return self.state.copy()
 
@@ -170,6 +172,10 @@ class TradingEnvironment(gym.Env):
     def is_at_min_inventory(self):
         return self.state[:, INVENTORY_INDEX] <= -self.max_inventory
 
+    @property
+    def midprice(self):
+        return self.midprice_model.current_state[:, 0].reshape(-1, 1)
+
     # The action space depends on the action_type but bids always precede asks for limit and market order actions.
     # state[0]=cash, state[1]=inventory, state[2]=time, state[3] = asset_price, and then remaining states depend on
     # the dimensionality of the arrival process, the midprice process and the fill probability process.
@@ -217,9 +223,11 @@ class TradingEnvironment(gym.Env):
         self._clip_inventory_and_cash()
         self.state[:, TIME_INDEX] += self.step_size
 
-    @property
-    def midprice(self):
-        return self.midprice_model.current_state[:, 0].reshape(-1, 1)
+    def _set_step_size(self, step_size:float):
+        if not isinstance(self.random_start, (float, int, NoneType)):
+            self.step_size = step_size
+            for process in self.stochastic_processes.values():
+                process.step_size = step_size
 
     def _clip_inventory_and_cash(self):
         self.state[:, INVENTORY_INDEX] = self._clip(
@@ -264,7 +272,8 @@ class TradingEnvironment(gym.Env):
         scalar_initial_state = np.array([[self.initial_cash, 0, 0.0]])
         initial_state = np.repeat(scalar_initial_state, self.num_trajectories, axis=0)
         if self.random_start is not None:
-            initial_state[:, TIME_INDEX] = self._get_random_start_time() * np.ones((self.num_trajectories,))
+            random_start_time = self._get_random_start_time()
+            initial_state[:, TIME_INDEX] = random_start_time * np.ones((self.num_trajectories,))
         initial_state[:, INVENTORY_INDEX] = self._get_initial_inventories()
         for process in self.stochastic_processes.values():
             initial_state = np.append(initial_state, process.initial_vector_state, axis=1)
@@ -287,8 +296,8 @@ class TradingEnvironment(gym.Env):
         elif isinstance(self.random_start, (tuple, list, np.ndarray)):
             assert self.random_start[0] <= self.random_start[1], "Random start proportion min must be less than max."
             random_step = np.random.randint(self.random_start[0] * self.n_steps, self.random_start[1] * self.n_steps)
-        elif isinstance(self.random_start, (rv_continuous_frozen, rv_discrete_frozen)):
-            return self.random_start.rvs()
+        elif isinstance(self.random_start, (rv_continuous_frozen, rv_discrete_frozen, Callable)):
+            return self._quantise_to_step(self.random_start.rvs())
         else:
             raise NotImplementedError
         return np.clip(random_step, 0, self.n_steps) * self.step_size
@@ -358,6 +367,7 @@ class TradingEnvironment(gym.Env):
             assert np.isclose(
                 self.reward_function.step_size, self.step_size, atol=0.0, rtol=0.01
             ), f"Trading environment step size is {self.step_size} but reward function has step size = {self.reward_function.step_size}."
+
 
     def seed(self, seed: int = None):
         self.rng = np.random.default_rng(seed)

@@ -297,7 +297,7 @@ class TradingEnvironment(gym.Env):
             assert self.random_start[0] <= self.random_start[1], "Random start proportion min must be less than max."
             random_step = np.random.randint(self.random_start[0] * self.n_steps, self.random_start[1] * self.n_steps)
         elif isinstance(self.random_start, (rv_continuous_frozen, rv_discrete_frozen, Callable)):
-            return self._quantise_to_step(self.random_start.rvs())
+            return self.random_start.rvs()
         else:
             raise NotImplementedError
         return np.clip(random_step, 0, self.n_steps) * self.step_size

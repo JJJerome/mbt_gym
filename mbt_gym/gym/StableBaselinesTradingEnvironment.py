@@ -132,6 +132,7 @@ class StableBaselinesTradingEnvironment(VecEnv):
         trajectory_rewards = []
         full_trajectory_env = deepcopy(self.env)
         full_trajectory_env.random_start = None
+        full_trajectory_env.step_size = full_trajectory_env.terminal_time / full_trajectory_env.n_steps
         num_trajectories = int(100_000 / self.env.num_trajectories)
         for _ in range(num_trajectories):
             _, _, rewards = generate_trajectory(full_trajectory_env, fixed_agent)

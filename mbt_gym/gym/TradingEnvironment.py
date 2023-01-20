@@ -1,5 +1,4 @@
 from collections import OrderedDict
-from types import NoneType
 from typing import Union, Tuple, Callable
 
 import gym
@@ -50,7 +49,7 @@ class TradingEnvironment(gym.Env):
         max_depth: float = None,
         max_speed: float = None,
         half_spread: float = None,
-        random_start: Union[float, int, tuple, list, rv_discrete_frozen, rv_continuous_frozen, Callable] = None,
+        random_start: Union[float, int, tuple, list, rv_discrete_frozen, rv_continuous_frozen, Callable] = 0.0,
         info_calculator: InfoCalculator = None,  # episode given as a proportion.
         seed: int = None,
         num_trajectories: int = 1,
@@ -224,7 +223,7 @@ class TradingEnvironment(gym.Env):
         self.state[:, TIME_INDEX] += self.step_size
 
     def _set_step_size(self, step_size:float):
-        if not isinstance(self.random_start, (float, int, NoneType)):
+        if not isinstance(self.random_start, (float, int)):
             self.step_size = step_size
             for process in self.stochastic_processes.values():
                 process.step_size = step_size
@@ -314,7 +313,7 @@ class TradingEnvironment(gym.Env):
         if self.action_type == "touch":
             return gym.spaces.MultiBinary(2)  # agent chooses spread on bid and ask
         if self.action_type == "limit":
-            assert self.max_depth is not None, "For limit orders max_depth cannot be NoneType"
+            assert self.max_depth is not None, "For limit orders max_depth cannot be None."
             # agent chooses spread on bid and ask
             return gym.spaces.Box(low=np.float32(0.0), high=np.float32(self.max_depth), shape=(2,))
         if self.action_type == "limit_and_market":

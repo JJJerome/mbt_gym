@@ -113,7 +113,8 @@ class TradingEnvironment(gym.Env):
         for process in self.stochastic_processes.values():
             process.reset()
         self.state = self.initial_state
-        self._set_step_size(self.state[0, TIME_INDEX])
+        step_size = (self.terminal_time - self.state[0, TIME_INDEX])/self.n_steps
+        self._set_step_size(step_size)
         self.reward_function.reset(self.state.copy())
         return self.state.copy()
 

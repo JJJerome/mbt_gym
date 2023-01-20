@@ -114,7 +114,7 @@ class TradingEnvironment(gym.Env):
             process.reset()
         self.state = self.initial_state
         step_size = (self.terminal_time - self.state[0, TIME_INDEX])/self.n_steps
-        self._set_step_size(step_size)
+        self.set_step_size(step_size)
         self.reward_function.reset(self.state.copy())
         return self.state.copy()
 
@@ -223,7 +223,7 @@ class TradingEnvironment(gym.Env):
         self._clip_inventory_and_cash()
         self.state[:, TIME_INDEX] += self.step_size
 
-    def _set_step_size(self, step_size:float):
+    def set_step_size(self, step_size:float):
         if not isinstance(self.random_start, (float, int)):
             self.step_size = step_size
             for process in self.stochastic_processes.values():

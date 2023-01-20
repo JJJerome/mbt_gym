@@ -113,8 +113,6 @@ class TradingEnvironment(gym.Env):
         for process in self.stochastic_processes.values():
             process.reset()
         self.state = self.initial_state
-        step_size = (self.terminal_time - self.state[0, TIME_INDEX])/self.n_steps
-        self.set_step_size(step_size)
         self.reward_function.reset(self.state.copy())
         return self.state.copy()
 
@@ -134,7 +132,7 @@ class TradingEnvironment(gym.Env):
         return next_state.copy(), rewards, dones, infos
 
     def _get_max_cash(self) -> float:
-        return self.n_steps * self.max_stock_price
+        return self.n_steps * self.max_stock_price  # TODO: make this a tighter bound
 
     def _get_max_depth(self) -> float:
         if self.fill_probability_model is not None:
@@ -223,11 +221,10 @@ class TradingEnvironment(gym.Env):
         self._clip_inventory_and_cash()
         self.state[:, TIME_INDEX] += self.step_size
 
-    def set_step_size(self, step_size:float):
-        if not isinstance(self.random_start, (float, int)):
-            self.step_size = step_size
-            for process in self.stochastic_processes.values():
-                process.step_size = step_size
+    def set_step_size(self, step_size: float):
+        self.step_size = step_size
+        for process in self.stochastic_processes.values():
+            process.step_size = step_size
 
     def _clip_inventory_and_cash(self):
         self.state[:, INVENTORY_INDEX] = self._clip(
@@ -292,17 +289,27 @@ class TradingEnvironment(gym.Env):
 
     def _get_random_start_time(self):
         if isinstance(self.random_start, (float, int)):
-            random_step = self.random_start * self.n_steps
+            random_start = self.random_start
         elif isinstance(self.random_start, (tuple, list, np.ndarray)):
             assert self.random_start[0] <= self.random_start[1], "Random start proportion min must be less than max."
-            random_step = np.random.randint(self.random_start[0] * self.n_steps, self.random_start[1] * self.n_steps)
+            assert self.random_start[0] > 0 and self.random_start[1] < 1, "Random start tuple must be in (0,1)."
+            random_start = (
+                np.random.randint(
+                    np.floor(self.random_start[0] * self.n_steps), np.ceil(self.random_start[1] * self.n_steps)
+                )
+                * self.step_size
+            )
         elif isinstance(self.random_start, (rv_continuous_frozen, rv_discrete_frozen)):
-            return self.random_start.rvs()
+            random_start = self.random_start.rvs()
         elif isinstance(self.random_start, Callable):
-            return self.random_start()
+            random_start = self.random_start()
         else:
             raise NotImplementedError
-        return np.clip(random_step, 0, self.n_steps) * self.step_size
+        return self._quantise_time_to_step(random_start)
+
+    def _quantise_time_to_step(self, time: float):
+        assert (time >= 0.0) and (time < self.terminal_time), "Start time is not within (0, env.terminal_time)."
+        return np.round(time / self.step_size) * self.step_size
 
     def _get_initial_inventories(self) -> np.ndarray:
         if isinstance(self.initial_inventory, tuple) and len(self.initial_inventory) == 2:
@@ -359,7 +366,7 @@ class TradingEnvironment(gym.Env):
         for process in self.stochastic_processes.values():
             assert np.isclose(process.step_size, self.step_size, atol=0.0, rtol=0.01), (
                 f"{type(self.midprice_model).__name__}.step_size = {process.step_size}, "
-                + f" but env.step_size = {self.terminal_time/self.n_steps}"
+                + f" but env.step_size = {self.step_size}"
             )
             assert process.num_trajectories == self.num_trajectories, (
                 "The stochastic processes given to an instance of TradingEnvironment must match the number of "
@@ -369,7 +376,6 @@ class TradingEnvironment(gym.Env):
             assert np.isclose(
                 self.reward_function.step_size, self.step_size, atol=0.0, rtol=0.01
             ), f"Trading environment step size is {self.step_size} but reward function has step size = {self.reward_function.step_size}."
-
 
     def seed(self, seed: int = None):
         self.rng = np.random.default_rng(seed)

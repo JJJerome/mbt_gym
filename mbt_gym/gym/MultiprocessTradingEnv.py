@@ -122,8 +122,12 @@ class MultiprocessTradingEnv(VecEnv):
         self.remotes[0].send(("get_attr", "num_trajectories"))
         num_trajectories = self.remotes[0].recv()
 
+        self.remotes[0].send(("get_attr", "n_steps"))
+        n_steps = self.remotes[0].recv()
+
         self.num_trajectories = num_trajectories
         self.num_multiprocess_envs = len(self.remotes)
+        self.n_steps = n_steps
 
         VecEnv.__init__(self, len(env_fns) * num_trajectories, observation_space, action_space)
 

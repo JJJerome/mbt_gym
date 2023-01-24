@@ -139,14 +139,14 @@ class MultiprocessTradingEnv(VecEnv):
         results = [remote.recv() for remote in self.remotes]
         self.waiting = False
         obs, rews, dones, infos = zip(*results)
-        obs = _flatten_obs(obs, self.observation_space)
-        return self.flatten_multi(obs), np.stack(rews), np.stack(dones), infos
+        obs = self.flatten_multi(_flatten_obs(obs, self.observation_space))
+        return obs, np.stack(rews), np.stack(dones), infos
 
     def flatten_multi(self, array:np.ndarray, inverse=False):
         if inverse:
             return array.reshape(self.num_multiprocess_envs, self.num_trajectories, -1)
         else:
-            return array.reshape(-1, array.shape[-1])
+            return array.reshape(self.num_multiprocess_envs * self.num_trajectories, -1)
 
     def seed(self, seed: Optional[int] = None) -> List[Union[None, int]]:
         if seed is None:

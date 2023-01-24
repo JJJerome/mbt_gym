@@ -157,7 +157,8 @@ class MultiprocessTradingEnv(VecEnv):
         for remote in self.remotes:
             remote.send(("reset", None))
         obs = [remote.recv() for remote in self.remotes]
-        return _flatten_obs(obs, self.observation_space)
+        obs = _flatten_obs(obs, self.observation_space)
+        return self.flatten_multi(obs)
 
     def close(self) -> None:
         if self.closed:

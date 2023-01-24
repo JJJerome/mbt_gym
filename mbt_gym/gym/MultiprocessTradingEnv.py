@@ -157,7 +157,7 @@ class MultiprocessTradingEnv(VecEnv):
         if inverse:
             return list(array.reshape(self.num_multiprocess_envs, self.num_trajectories_per_env, -1))
         else:
-            return array.reshape(self.num_multiprocess_envs * self.num_trajectories_per_env, -1)
+            return array.reshape(self.num_multiprocess_envs * self.num_trajectories_per_env, -1).squeeze()
 
     def seed(self, seed: Optional[int] = None) -> List[Union[None, int]]:
         if seed is None:

@@ -140,7 +140,9 @@ class MultiprocessTradingEnv(VecEnv):
         self.waiting = False
         obs, rews, dones, infos = zip(*results)
         obs = self.flatten_multi(_flatten_obs(obs, self.observation_space))
-        return obs, np.stack(rews), np.stack(dones), infos
+        rews = self.flatten_multi(np.stack(rews))
+        dones = self.flatten_multi(np.stack(dones))
+        return obs, rews, dones, list(np.stack(infos).reshape(-1))
 
     def flatten_multi(self, array:np.ndarray, inverse=False):
         if inverse:

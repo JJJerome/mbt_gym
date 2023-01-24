@@ -120,16 +120,17 @@ class MultiprocessTradingEnv(VecEnv):
         observation_space, action_space = self.remotes[0].recv()
 
         self.remotes[0].send(("get_attr", "num_trajectories"))
-        num_trajectories = self.remotes[0].recv()
+        num_trajectories_per_env = self.remotes[0].recv()
 
         self.remotes[0].send(("get_attr", "n_steps"))
         n_steps = self.remotes[0].recv()
 
-        self.num_trajectories = num_trajectories
+        self.num_trajectories_per_env = num_trajectories_per_env
         self.num_multiprocess_envs = len(self.remotes)
         self.n_steps = n_steps
+        self.num_trajectories = len(env_fns) * num_trajectories_per_env
 
-        VecEnv.__init__(self, len(env_fns) * num_trajectories, observation_space, action_space)
+        VecEnv.__init__(self, self.num_trajectories, observation_space, action_space)
 
 
     def step_async(self, actions: np.ndarray) -> None:
@@ -149,9 +150,9 @@ class MultiprocessTradingEnv(VecEnv):
 
     def flatten_multi(self, array:np.ndarray, inverse=False):
         if inverse:
-            return array.reshape(self.num_multiprocess_envs, self.num_trajectories, -1)
+            return array.reshape(self.num_multiprocess_envs, self.num_trajectories_per_env, -1)
         else:
-            return array.reshape(self.num_multiprocess_envs * self.num_trajectories, -1)
+            return array.reshape(self.num_multiprocess_envs * self.num_trajectories_per_env, -1)
 
     def seed(self, seed: Optional[int] = None) -> List[Union[None, int]]:
         if seed is None:

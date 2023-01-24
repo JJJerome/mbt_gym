@@ -1,6 +1,6 @@
 import multiprocessing as mp
 from collections import OrderedDict
-from typing import Any, Callable, List, Optional, Sequence, Tuple, Type, Union
+from typing import Any, Callable, List, Optional, Sequence, Tuple, Type, Union, Iterable
 
 import gym
 import numpy as np
@@ -120,6 +120,7 @@ class MultiprocessTradingEnv(VecEnv):
         self.remotes[0].send(("get_attr", "num_trajectories"))
         num_trajectories = self.remotes[0].recv()
         VecEnv.__init__(self, len(env_fns) * num_trajectories, observation_space, action_space)
+        self.num_multiprocess_envs = len(self.remotes)
 
     def step_async(self, actions: np.ndarray) -> None:
         for remote, action in zip(self.remotes, actions):
@@ -204,6 +205,19 @@ class MultiprocessTradingEnv(VecEnv):
         """
         indices = self._get_indices(indices)
         return [self.remotes[i] for i in indices]
+
+    def _get_indices(self, indices: VecEnvIndices) -> Iterable[int]:
+        """
+        Convert a flexibly-typed reference to environment indices to an implied list of indices.
+
+        :param indices: refers to indices of envs.
+        :return: the implied list of indices.
+        """
+        if indices is None:
+            indices = range(self.num_multiprocess_envs)
+        elif isinstance(indices, int):
+            indices = [indices]
+        return indices
 
 
 def _flatten_obs(obs: Union[List[VecEnvObs], Tuple[VecEnvObs]], space: spaces.Space) -> VecEnvObs:

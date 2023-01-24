@@ -104,6 +104,7 @@ class MultiprocessTradingEnv(VecEnv):
             # a `if __name__ == "__main__":`)
             forkserver_available = "forkserver" in mp.get_all_start_methods()
             start_method = "forkserver" if forkserver_available else "spawn"
+        print(f"Start method is {start_method}")
         ctx = mp.get_context(start_method)
 
         self.remotes, self.work_remotes = zip(*[ctx.Pipe() for _ in range(n_envs)])

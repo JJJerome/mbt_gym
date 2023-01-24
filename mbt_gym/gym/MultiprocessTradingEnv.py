@@ -28,7 +28,7 @@ def _worker(
         try:
             cmd, data = remote.recv()
             if cmd == "step":
-                observation, reward, done, info = env.step(data)
+                observation, reward, done, infos = env.step(data)
                 single_done = done[0] if len(done)>1 else done
                 if single_done:
                     if STORE_TERMINAL_OBSERVATION_INFO:
@@ -37,7 +37,7 @@ def _worker(
                             # save final observation where user can get it, then automatically reset (an SB3 convention).
                             info["terminal_observation"] = observation[count, :]
                     observation = env.reset()
-                remote.send((observation, reward, done, info))
+                remote.send((observation, reward, done, infos))
             elif cmd == "seed":
                 remote.send(env.seed(data))
             elif cmd == "reset":

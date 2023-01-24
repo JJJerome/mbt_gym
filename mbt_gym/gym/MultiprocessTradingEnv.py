@@ -14,6 +14,7 @@ from stable_baselines3.common.vec_env.base_vec_env import (
     VecEnvStepReturn,
 )
 
+STORE_TERMINAL_OBSERVATION_INFO = True
 
 def _worker(
     remote: mp.connection.Connection, parent_remote: mp.connection.Connection, env_fn_wrapper: CloudpickleWrapper
@@ -30,8 +31,11 @@ def _worker(
                 observation, reward, done, info = env.step(data)
                 single_done = done[0] if len(done)>1 else done
                 if single_done:
-                    # save final observation where user can get it, then reset
-                    info["terminal_observation"] = observation
+                    if STORE_TERMINAL_OBSERVATION_INFO:
+                        infos = infos.copy()
+                        for count, info in enumerate(infos):
+                            # save final observation where user can get it, then automatically reset (an SB3 convention).
+                            info["terminal_observation"] = observation[count, :]
                     observation = env.reset()
                 remote.send((observation, reward, done, info))
             elif cmd == "seed":

@@ -163,7 +163,7 @@ class ExogenousMmFillProbabilityModel(FillProbabilityModel):
 
     @property
     def max_depth(self) -> float:
-        return -np.log(0.01) / self.fill_exponent + self.exogenous_best_depth_processes[0].max_value
+        return -np.log(0.01) / self.fill_exponent + np.max(self.exogenous_best_depth_processes[0].max_value)
 
     def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray):
         for process in self.exogenous_best_depth_processes:

@@ -6,9 +6,11 @@ from stable_baselines3.common.base_class import BaseAlgorithm
 
 
 class SbAgent(Agent):
-    def __init__(self, model: BaseAlgorithm, reduced_training_indices: list = None):
+    def __init__(self, model: BaseAlgorithm,
+                 reduced_training_indices: list = None,
+                 num_trajectories:int = None):
         self.model = model
-        self.num_trajectories = self.model.env.num_trajectories
+        self.num_trajectories = num_trajectories or self.model.env.num_trajectories
         self.num_actions = self.model.action_space.shape[0]
         if reduced_training_indices is not None:
             self.reduced_training = True

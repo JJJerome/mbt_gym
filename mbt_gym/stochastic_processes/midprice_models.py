@@ -7,6 +7,28 @@ from mbt_gym.stochastic_processes.StochasticProcessModel import StochasticProces
 
 MidpriceModel = StochasticProcessModel
 
+class ConstantMidpriceModel(MidpriceModel):
+    def __init__(
+        self,
+        initial_price: float = 100,
+        terminal_time: float = 1.0,
+        step_size: float = 0.01,
+        num_trajectories: int = 1,
+        seed: Optional[int] = None,
+    ):
+        self.terminal_time = terminal_time
+        super().__init__(
+            min_value=np.array([[initial_price]]),
+            max_value=np.array([[initial_price]]),
+            step_size=step_size,
+            terminal_time=terminal_time,
+            initial_state=np.array([[initial_price]]),
+            num_trajectories=num_trajectories,
+            seed=seed,
+        )
+
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> np.ndarray:
+        pass
 
 class BrownianMotionMidpriceModel(MidpriceModel):
     def __init__(

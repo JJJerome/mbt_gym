@@ -141,8 +141,8 @@ class ExogenousMmFillProbabilityModel(FillProbabilityModel):
         self.fill_exponent = fill_exponent
         self.base_fill_probability = base_fill_probability
         super().__init__(
-            min_value=np.concatenate((process.min_value for process in self.exogenous_best_depth_processes), axis=1),
-            max_value=np.concatenate((process.max_value for process in self.exogenous_best_depth_processes), axis=1),
+            min_value=np.concatenate([process.min_value for process in self.exogenous_best_depth_processes], axis=1),
+            max_value=np.concatenate([process.max_value for process in self.exogenous_best_depth_processes], axis=1),
             step_size=step_size,
             terminal_time=0.0,
             initial_state=np.concatenate(

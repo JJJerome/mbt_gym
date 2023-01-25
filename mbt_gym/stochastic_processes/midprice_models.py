@@ -7,6 +7,7 @@ from mbt_gym.stochastic_processes.StochasticProcessModel import StochasticProces
 
 MidpriceModel = StochasticProcessModel
 
+
 class ConstantMidpriceModel(MidpriceModel):
     def __init__(
         self,
@@ -29,6 +30,7 @@ class ConstantMidpriceModel(MidpriceModel):
 
     def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> np.ndarray:
         pass
+
 
 class BrownianMotionMidpriceModel(MidpriceModel):
     def __init__(

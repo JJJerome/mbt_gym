@@ -21,7 +21,7 @@ class StableBaselinesTradingEnvironment(VecEnv):
         normalise_action_space: bool = True,
         normalise_observation_space: bool = True,
         normalise_rewards: bool = False,
-        reward_normalisation_trajectories: int = 100_000
+        reward_normalisation_trajectories: int = 100_000,
     ):
         self.env = trading_env
         self.store_terminal_observation_info = store_terminal_observation_info

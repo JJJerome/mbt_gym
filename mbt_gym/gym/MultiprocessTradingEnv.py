@@ -16,6 +16,7 @@ from stable_baselines3.common.vec_env.base_vec_env import (
 
 STORE_TERMINAL_OBSERVATION_INFO = True
 
+
 def _worker(
     remote: mp.connection.Connection, parent_remote: mp.connection.Connection, env_fn_wrapper: CloudpickleWrapper
 ) -> None:
@@ -29,7 +30,7 @@ def _worker(
             cmd, data = remote.recv()
             if cmd == "step":
                 observation, reward, done, infos = env.step(data)
-                single_done = done[0] if len(done)>1 else done
+                single_done = done[0] if len(done) > 1 else done
                 if single_done:
                     if STORE_TERMINAL_OBSERVATION_INFO:
                         infos = infos.copy()
@@ -137,7 +138,6 @@ class MultiprocessTradingEnv(VecEnv):
 
         VecEnv.__init__(self, self.num_trajectories, observation_space, action_space)
 
-
     def step_async(self, actions: np.ndarray) -> None:
         multi_actions = self.flatten_multi(actions, inverse=True)
         for remote, action in zip(self.remotes, multi_actions):
@@ -153,7 +153,7 @@ class MultiprocessTradingEnv(VecEnv):
         dones = self.flatten_multi(np.stack(dones))
         return obs, rews, dones, list(np.stack(infos).reshape(-1))
 
-    def flatten_multi(self, array:np.ndarray, inverse=False):
+    def flatten_multi(self, array: np.ndarray, inverse=False):
         if inverse:
             return list(array.reshape(self.num_multiprocess_envs, self.num_trajectories_per_env, -1))
         else:

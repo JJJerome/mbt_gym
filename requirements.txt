@@ -12,4 +12,4 @@ seaborn==0.11.2
 stable_baselines3==1.6.2
 stochastic==0.6.0
 tensorboard
-torch==1.11.0
+torch>=1.13.1

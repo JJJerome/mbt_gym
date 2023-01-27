@@ -66,7 +66,7 @@ class TradingEnvironment(gym.Env):
         self.fill_probability_model = fill_probability_model
         self.price_impact_model = price_impact_model
         self.action_type = action_type
-        self._check_stochastic_processes()
+        self._check_required_stochastic_processes()
         self.stochastic_processes = self._get_stochastic_processes()
         self.stochastic_process_indices = self._get_stochastic_process_indices()
         self.initial_cash = initial_cash
@@ -334,7 +334,7 @@ class TradingEnvironment(gym.Env):
     def _clamp(probability):
         return max(min(probability, 1), 0)
 
-    def _check_stochastic_processes(self) -> None:
+    def _check_required_stochastic_processes(self) -> None:
         assert self.action_type in ACTION_TYPES, f"Action type '{self.action_type}' is not in {ACTION_TYPES}."
         if self.action_type == "touch":
             processes = ["arrival_model"]

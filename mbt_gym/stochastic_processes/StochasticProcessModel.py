@@ -49,5 +49,5 @@ class StochasticProcessModel(metaclass=abc.ABCMeta):
     def _get_initial_vector_state(self) -> np.ndarray:
         initial_state = self.initial_state
         if isinstance(initial_state, list):
-            initial_state = np.array([[self.initial_state]])
+            initial_state = np.array([self.initial_state])
         return np.repeat(initial_state, self.num_trajectories, axis=0)

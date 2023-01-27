@@ -85,7 +85,7 @@ class TradingEnvironment(gym.Env):
         self.action_space = self._get_action_space()
         self.fixed_market_half_spread = fixed_market_half_spread
         self.info_calculator = info_calculator
-        self.empty_infos = [{} for _ in range(self.num_trajectories)] if self.num_trajectories > 1 else {}
+        self._empty_infos = self._get_empty_infos()
         ones = np.ones((self.num_trajectories, 1))
         self.multiplier = np.append(-ones, ones, axis=1)
 
@@ -107,7 +107,7 @@ class TradingEnvironment(gym.Env):
         infos = (
             self.info_calculator.calculate(current_state, action, rewards)
             if self.info_calculator is not None
-            else self.empty_infos
+            else self._empty_infos
         )
         return next_state.copy(), rewards, dones, infos
 
@@ -163,6 +163,7 @@ class TradingEnvironment(gym.Env):
                 if verbose:
                     print(f"Setting value of {process_name}.num_trajectories to {num_trajectories}.")
                 process.num_trajectories = num_trajectories
+        self._empty_infos = self._get_empty_infos()
 
     # The action space depends on the action_type but bids always precede asks for limit and market order actions.
     # state[0]=cash, state[1]=inventory, state[2]=time, state[3] = asset_price, and then remaining states depend on
@@ -367,6 +368,9 @@ class TradingEnvironment(gym.Env):
             process_indices[process_name] = (count, count + dimension)
             count += dimension
         return OrderedDict(process_indices)
+
+    def _get_empty_infos(self):
+        return [{} for _ in range(self.num_trajectories)] if self.num_trajectories > 1 else {}
 
     def seed(self, seed: int = None):
         self.rng = np.random.default_rng(seed)

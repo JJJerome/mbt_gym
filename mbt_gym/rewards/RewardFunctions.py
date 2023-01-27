@@ -117,13 +117,11 @@ class RunningInventoryPenalty(RewardFunction):
         per_step_inventory_aversion: float = 0.01,
         terminal_inventory_aversion: float = 0.0,
         inventory_exponent: float = 2.0,
-        step_size: float = 1.0 / 200,
     ):
         self.per_step_inventory_aversion = per_step_inventory_aversion
         self.terminal_inventory_aversion = terminal_inventory_aversion
         self.pnl = PnL()
         self.inventory_exponent = inventory_exponent
-        self.step_size = step_size
 
     def calculate(
         self, current_state: np.ndarray, action: np.ndarray, next_state: np.ndarray, is_terminal_step: bool = False

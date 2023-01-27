@@ -74,7 +74,6 @@ class TradingEnvironment(gym.Env):
         self.initial_cash = initial_cash
         self.initial_inventory = initial_inventory
         self.max_inventory = max_inventory
-        self._check_params()
         self.rng = np.random.default_rng(seed)
         if seed:
             self.seed(seed)
@@ -370,23 +369,6 @@ class TradingEnvironment(gym.Env):
         assert len(seeds) == len(
             set(seeds)
         ), "Stochastic processes associated to TradingEnvironment must have different seeds."
-
-    def _check_params(self):
-        assert self.action_type in ACTION_TYPES
-        for process in self.stochastic_processes.values():
-            assert np.isclose(process.step_size, self.step_size, atol=0.0, rtol=0.01), (
-                f"{type(self.midprice_model).__name__}.step_size = {process.step_size}, "
-                + f" but env.step_size = {self.step_size}"
-            )
-            assert process.num_trajectories == self.num_trajectories, (
-                "The stochastic processes given to an instance of TradingEnvironment must match the number of "
-                "trajectories specified."
-            )
-        if hasattr(self.reward_function, "step_size"):
-            assert np.isclose(self.reward_function.step_size, self.step_size, atol=0.0, rtol=0.01), (
-                f"Trading environment step size is {self.step_size} but reward function has "
-                + "step size = {self.reward_function.step_size}."
-            )
 
     def _get_stochastic_processes(self):
         stochastic_processes = dict()

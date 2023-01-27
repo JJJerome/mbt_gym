@@ -70,7 +70,6 @@ class TradingEnvironment(gym.Env):
         self._check_stochastic_processes()
         self.stochastic_processes = self._get_stochastic_processes()
         self.stochastic_process_indices = self._get_stochastic_process_indices()
-        self._check_stochastic_seeds()
         self.initial_cash = initial_cash
         self.initial_inventory = initial_inventory
         self.max_inventory = max_inventory
@@ -363,12 +362,6 @@ class TradingEnvironment(gym.Env):
 
     def _check_process_is_not_none(self, process: str):
         assert getattr(self, process) is not None, f"Action type is '{self.action_type}' but env.{process} is None."
-
-    def _check_stochastic_seeds(self):
-        seeds = [process.seed_ for process in self.stochastic_processes.values() if process.seed_ is not None]
-        assert len(seeds) == len(
-            set(seeds)
-        ), "Stochastic processes associated to TradingEnvironment must have different seeds."
 
     def _get_stochastic_processes(self):
         stochastic_processes = dict()

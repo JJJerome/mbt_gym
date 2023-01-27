@@ -87,7 +87,7 @@ class TradingEnvironment(gym.Env):
         self.info_calculator = info_calculator
         self._empty_infos = self._get_empty_infos()
         ones = np.ones((self.num_trajectories, 1))
-        self.multiplier = np.append(-ones, ones, axis=1)
+        self.fill_multiplier = np.append(-ones, ones, axis=1)
 
     def reset(self):
         for process in self.stochastic_processes.values():
@@ -194,14 +194,14 @@ class TradingEnvironment(gym.Env):
             self.state[:, INVENTORY_INDEX] += mo_buy - mo_sell
         elif self.action_type == "touch":
             self.state[:, CASH_INDEX] += np.sum(
-                self.multiplier * arrivals * fills * (self.midprice + self.fixed_market_half_spread * self.multiplier),
+                self.fill_multiplier * arrivals * fills * (self.midprice + self.fixed_market_half_spread * self.fill_multiplier),
                 axis=1,
             )
-            self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self.multiplier, axis=1)
+            self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self.fill_multiplier, axis=1)
         elif self.action_type in ["limit", "limit_and_market"]:
-            self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self.multiplier, axis=1)
+            self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self.fill_multiplier, axis=1)
             self.state[:, CASH_INDEX] += np.sum(
-                self.multiplier * arrivals * fills * (self.midprice + self._limit_depths(action) * self.multiplier),
+                self.fill_multiplier * arrivals * fills * (self.midprice + self._limit_depths(action) * self.fill_multiplier),
                 axis=1,
             )
         if self.action_type in EXECUTION_ACTION_TYPES:

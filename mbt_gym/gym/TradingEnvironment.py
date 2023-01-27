@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from typing import Union, Tuple, Callable
+from typing import Union, Tuple, Callable, Optional
 
 import gym
 import numpy as np
@@ -72,9 +72,9 @@ class TradingEnvironment(gym.Env):
         self.initial_cash = initial_cash
         self.initial_inventory = initial_inventory
         self.max_inventory = max_inventory
-        self.rng = np.random.default_rng(seed)
         if seed:
             self.seed(seed)
+        self.rng = np.random.default_rng(seed)
         self.start_time = start_time
         self.state = self.initial_state
         self.max_stock_price = max_stock_price or self.midprice_model.max_value[0, 0]
@@ -256,7 +256,7 @@ class TradingEnvironment(gym.Env):
     def _get_max_cash(self) -> float:
         return self.n_steps * self.max_stock_price  # TODO: make this a tighter bound
 
-    def _get_max_depth(self) -> float:
+    def _get_max_depth(self) -> Optional[float]:
         if self.fill_probability_model is not None:
             return self.fill_probability_model.max_depth
         else:

@@ -47,7 +47,7 @@ class TradingEnvironment(gym.Env):
         max_stock_price: float = None,
         max_depth: float = None,
         max_speed: float = None,
-        half_spread: float = None,
+        fixed_market_half_spread: float = None,
         start_time: Union[float, int, Callable] = 0.0,
         info_calculator: InfoCalculator = None,  # episode given as a proportion.
         seed: int = None,
@@ -83,7 +83,7 @@ class TradingEnvironment(gym.Env):
         self.max_speed = max_speed or self._get_max_speed()
         self.observation_space = self._get_observation_space()
         self.action_space = self._get_action_space()
-        self.half_spread = half_spread
+        self.fixed_market_half_spread = fixed_market_half_spread
         self.info_calculator = info_calculator
         self.empty_infos = [{} for _ in range(self.num_trajectories)] if self.num_trajectories > 1 else {}
         ones = np.ones((self.num_trajectories, 1))
@@ -139,7 +139,7 @@ class TradingEnvironment(gym.Env):
         return self._step_size
 
     @step_size.setter
-    def step_size(self, step_size: float, verbose:bool = True):
+    def step_size(self, step_size: float, verbose: bool = True):
         self._step_size = step_size
         for process_name, process in self.stochastic_processes.items():
             if process.step_size != step_size:
@@ -187,13 +187,14 @@ class TradingEnvironment(gym.Env):
         if self.action_type == "limit_and_market":
             mo_buy = np.single(self._market_order_buy(action) > 0.5)
             mo_sell = np.single(self._market_order_sell(action) > 0.5)
-            best_bid = self.midprice - self.half_spread
-            best_ask = self.midprice + self.half_spread
+            best_bid = self.midprice - self.fixed_market_half_spread
+            best_ask = self.midprice + self.fixed_market_half_spread
             self.state[:, CASH_INDEX] += mo_sell * best_bid - mo_buy * best_ask
             self.state[:, INVENTORY_INDEX] += mo_buy - mo_sell
         elif self.action_type == "touch":
             self.state[:, CASH_INDEX] += np.sum(
-                self.multiplier * arrivals * fills * (self.midprice + self.half_spread * self.multiplier), axis=1
+                self.multiplier * arrivals * fills * (self.midprice + self.fixed_market_half_spread * self.multiplier),
+                axis=1,
             )
             self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self.multiplier, axis=1)
         elif self.action_type in ["limit", "limit_and_market"]:

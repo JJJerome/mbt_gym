@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from copy import copy, deepcopy
 from typing import Union, Tuple, Callable, Optional
 
 import gym
@@ -6,9 +7,11 @@ import numpy as np
 
 from gym.spaces import Box
 
+from mbt_gym.agents.Agent import Agent
+from mbt_gym.gym.helpers.generate_trajectory import generate_trajectory
 from mbt_gym.stochastic_processes.StochasticProcessModel import StochasticProcessModel
-from mbt_gym.stochastic_processes.arrival_models import ArrivalModel
-from mbt_gym.stochastic_processes.fill_probability_models import FillProbabilityModel
+from mbt_gym.stochastic_processes.arrival_models import ArrivalModel, PoissonArrivalModel
+from mbt_gym.stochastic_processes.fill_probability_models import FillProbabilityModel, ExponentialFillFunction
 from mbt_gym.stochastic_processes.midprice_models import MidpriceModel, BrownianMotionMidpriceModel
 from mbt_gym.stochastic_processes.price_impact_models import PriceImpactModel
 from mbt_gym.gym.info_calculators import InfoCalculator
@@ -52,12 +55,13 @@ class TradingEnvironment(gym.Env):
         info_calculator: InfoCalculator = None,  # episode given as a proportion.
         seed: int = None,
         num_trajectories: int = 1,
+        normalise_action_space: bool = True,
+        normalise_observation_space: bool = True,
+        normalise_rewards: bool = False,
     ):
         super(TradingEnvironment, self).__init__()
         self.terminal_time = terminal_time
-        self._num_trajectories = num_trajectories
         self.n_steps = n_steps
-        self._step_size = self.terminal_time / self.n_steps
         self.reward_function = reward_function or PnL()
         self.midprice_model = midprice_model or BrownianMotionMidpriceModel(
             step_size=self._step_size, num_trajectories=num_trajectories
@@ -69,6 +73,8 @@ class TradingEnvironment(gym.Env):
         self._check_required_stochastic_processes()
         self.stochastic_processes = self._get_stochastic_processes()
         self.stochastic_process_indices = self._get_stochastic_process_indices()
+        self.num_trajectories = num_trajectories
+        self.step_size = self.terminal_time / self.n_steps
         self.initial_cash = initial_cash
         self.initial_inventory = initial_inventory
         self.max_inventory = max_inventory
@@ -81,24 +87,38 @@ class TradingEnvironment(gym.Env):
         self.max_cash = max_cash or self._get_max_cash()
         self.max_depth = max_depth or self._get_max_depth()
         self.max_speed = max_speed or self._get_max_speed()
-        self.observation_space = self._get_observation_space()
-        self.action_space = self._get_action_space()
         self.fixed_market_half_spread = fixed_market_half_spread
         self.info_calculator = info_calculator
         self._empty_infos = self._get_empty_infos()
-        ones = np.ones((self.num_trajectories, 1))
-        self.fill_multiplier = np.append(-ones, ones, axis=1)
+        self._fill_multiplier = self._get_fill_multiplier()
+        self.observation_space = self._get_observation_space()
+        self.action_space = self._get_action_space()
+        self.normalise_action_space_ = normalise_action_space
+        self.normalise_observation_space_ = normalise_observation_space
+        self.normalise_rewards_ = normalise_rewards
+        if self.normalise_observation_space_:
+            self.original_observation_space = copy(self.observation_space)
+            self.observation_space = self._get_normalised_observation_space()
+        if self.normalise_action_space_:
+            self.original_action_space = copy(self.action_space)
+            self.action_space = self._get_normalised_action_space()
+        if self.normalise_rewards_:
+            assert isinstance(self.arrival_model, PoissonArrivalModel) and isinstance(
+                self.fill_probability_model, ExponentialFillFunction
+            ), "Arrival model must be Poisson and fill probability model must be exponential to scale rewards"
+            self.reward_scaling = 1 / self._get_inventory_neutral_rewards()
 
     def reset(self):
         for process in self.stochastic_processes.values():
             process.reset()
         self.state = self.initial_state
         self.reward_function.reset(self.state.copy())
-        return self.state.copy()
+        return self.normalise_observation(self.state.copy())
 
     def step(self, action: np.ndarray):
         if action.shape != (self.num_trajectories, self.action_space.shape[0]):
             action = action.reshape(self.num_trajectories, self.action_space.shape[0])
+        action = self.normalise_action(action, inverse=True)
         current_state = self.state.copy()
         next_state = self._update_state(action)
         done = self.state[0, TIME_INDEX] >= self.terminal_time - self.step_size / 2
@@ -109,7 +129,26 @@ class TradingEnvironment(gym.Env):
             if self.info_calculator is not None
             else self._empty_infos
         )
-        return next_state.copy(), rewards, dones, infos
+        return self.normalise_observation(next_state.copy()), self.normalise_rewards(rewards), dones, infos
+
+    def normalise_observation(self, obs: np.ndarray, inverse: bool = False):
+        if self.normalise_observation_space_ and not inverse:
+            return (obs - self._intercept_obs_norm) / self._gradient_obs_norm - 1
+        elif self.normalise_observation_space_ and inverse:
+            return (obs + 1) * self._gradient_obs_norm + self._intercept_obs_norm
+        else:
+            return obs
+
+    def normalise_action(self, action: np.ndarray, inverse: bool = False):
+        if self.normalise_action_space_ and not inverse:
+            return (action - self._intercept_action_norm) / self._gradient_action_norm - 1
+        elif self.normalise_action_space_ and inverse:
+            return (action + 1) * self._gradient_action_norm + self._intercept_action_norm
+        else:
+            return action
+
+    def normalise_rewards(self, rewards: np.ndarray):
+        return self.reward_scaling * rewards if self.normalise_rewards_ else rewards
 
     @property
     def initial_state(self) -> np.ndarray:
@@ -139,16 +178,12 @@ class TradingEnvironment(gym.Env):
         return self._step_size
 
     @step_size.setter
-    def step_size(self, step_size: float, verbose: bool = True):
+    def step_size(self, step_size: float):
         self._step_size = step_size
         for process_name, process in self.stochastic_processes.items():
             if process.step_size != step_size:
-                if verbose:
-                    print(f"Setting value of {process_name}.step_size to {step_size}.")
                 process.step_size = step_size
         if hasattr(self.reward_function, "step_size"):
-            if verbose:
-                print(f"Setting value of reward_function.step_size to {step_size}.")
             self.reward_function.step_size = step_size
 
     @property
@@ -156,14 +191,29 @@ class TradingEnvironment(gym.Env):
         return self._num_trajectories
 
     @num_trajectories.setter
-    def num_trajectories(self, num_trajectories: float, verbose: bool = True):
+    def num_trajectories(self, num_trajectories: float):
         self._num_trajectories = num_trajectories
         for process_name, process in self.stochastic_processes.items():
             if process.num_trajectories != num_trajectories:
-                if verbose:
-                    print(f"Setting value of {process_name}.num_trajectories to {num_trajectories}.")
                 process.num_trajectories = num_trajectories
         self._empty_infos = self._get_empty_infos()
+        self._fill_multiplier = self._get_fill_multiplier()
+
+    @property
+    def _intercept_obs_norm(self):
+        return self.original_observation_space.low
+
+    @property
+    def _gradient_obs_norm(self):
+        return (self.original_observation_space.high - self.original_observation_space.low) / 2
+
+    @property
+    def _intercept_action_norm(self):
+        return self.original_action_space.low
+
+    @property
+    def _gradient_action_norm(self):
+        return (self.original_action_space.high - self.original_action_space.low) / 2
 
     # The action space depends on the action_type but bids always precede asks for limit and market order actions.
     # state[0]=cash, state[1]=inventory, state[2]=time, state[3] = asset_price, and then remaining states depend on
@@ -194,14 +244,14 @@ class TradingEnvironment(gym.Env):
             self.state[:, INVENTORY_INDEX] += mo_buy - mo_sell
         elif self.action_type == "touch":
             self.state[:, CASH_INDEX] += np.sum(
-                self.fill_multiplier * arrivals * fills * (self.midprice + self.fixed_market_half_spread * self.fill_multiplier),
+                self._fill_multiplier * arrivals * fills * (self.midprice + self.fixed_market_half_spread * self._fill_multiplier),
                 axis=1,
             )
-            self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self.fill_multiplier, axis=1)
+            self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self._fill_multiplier, axis=1)
         elif self.action_type in ["limit", "limit_and_market"]:
-            self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self.fill_multiplier, axis=1)
+            self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self._fill_multiplier, axis=1)
             self.state[:, CASH_INDEX] += np.sum(
-                self.fill_multiplier * arrivals * fills * (self.midprice + self._limit_depths(action) * self.fill_multiplier),
+                self._fill_multiplier * arrivals * fills * (self.midprice + self._limit_depths(action) * self._fill_multiplier),
                 axis=1,
             )
         if self.action_type in EXECUTION_ACTION_TYPES:
@@ -281,6 +331,37 @@ class TradingEnvironment(gym.Env):
             high = np.append(high, process.max_value)
         return Box(low=np.float32(low), high=np.float32(high))
 
+    def _get_action_space(self) -> gym.spaces.Space:
+        if self.action_type == "touch":
+            return gym.spaces.MultiBinary(2)  # agent chooses spread on bid and ask
+        elif self.action_type == "limit":
+            assert self.max_depth is not None, "For limit orders max_depth cannot be None."
+            # agent chooses spread on bid and ask
+            return gym.spaces.Box(low=np.float32(0.0), high=np.float32(self.max_depth), shape=(2,))
+        elif self.action_type == "limit_and_market":
+            return gym.spaces.Box(
+                low=np.zeros(4),
+                high=np.array([self.max_depth, self.max_depth, 1, 1], dtype=np.float32),
+            )
+        elif self.action_type == "speed":
+            # agent chooses speed of trading: positive buys, negative sells
+            return gym.spaces.Box(low=np.float32([-self.max_speed]), high=np.float32([self.max_speed]))
+
+    def _get_normalised_observation_space(self):
+        # Linear normalisation of the gym.Box space so that the domain of the observation space is [-1,1].
+        return gym.spaces.Box(
+            low=-np.ones_like(self.observation_space.low, dtype=np.float32),
+            high=np.ones_like(self.observation_space.high, dtype=np.float32),
+        )
+
+    def _get_normalised_action_space(self):
+        # Linear normalisation of the gym.Box space so that the domain of the action space is [-1,1].
+        return gym.spaces.Box(
+            low=-np.ones_like(self.action_space.low, dtype=np.float32),
+            high=np.ones_like(self.action_space.high, dtype=np.float32),
+        )
+
+
     def _get_start_time(self):
         if isinstance(self.start_time, (float, int)):
             random_start = self.start_time
@@ -315,22 +396,6 @@ class TradingEnvironment(gym.Env):
         if (not_clipped != clipped).any() and not cash_flag:
             print(f"Clipping agent's inventory from {not_clipped} to {clipped}.")
         return clipped
-
-    def _get_action_space(self) -> gym.spaces.Space:
-        if self.action_type == "touch":
-            return gym.spaces.MultiBinary(2)  # agent chooses spread on bid and ask
-        if self.action_type == "limit":
-            assert self.max_depth is not None, "For limit orders max_depth cannot be None."
-            # agent chooses spread on bid and ask
-            return gym.spaces.Box(low=np.float32(0.0), high=np.float32(self.max_depth), shape=(2,))
-        if self.action_type == "limit_and_market":
-            return gym.spaces.Box(
-                low=np.zeros(4),
-                high=np.array([self.max_depth, self.max_depth, 1, 1], dtype=np.float32),
-            )
-        if self.action_type == "speed":
-            # agent chooses speed of trading: positive buys, negative sells
-            return gym.spaces.Box(low=np.float32([-self.max_speed]), high=np.float32([self.max_speed]))
 
     @staticmethod
     def _clamp(probability):
@@ -371,6 +436,24 @@ class TradingEnvironment(gym.Env):
 
     def _get_empty_infos(self):
         return [{} for _ in range(self.num_trajectories)] if self.num_trajectories > 1 else {}
+
+    def _get_fill_multiplier(self):
+        ones = np.ones((self.num_trajectories, 1))
+        return np.append(-ones, ones, axis=1)
+
+    def _get_inventory_neutral_rewards(self, num_total_trajectories = 100_000):
+        fixed_action = 1 / self.fill_probability_model.fill_exponent
+        full_trajectory_env = deepcopy(self)
+        full_trajectory_env.start_time = 0.0
+        full_trajectory_env.num_trajectories = num_total_trajectories
+        full_trajectory_env.normalise_rewards_ = False
+        class FixedAgent(Agent):
+            def get_action(self, obs:np.ndarray) -> np.ndarray:
+                return np.ones((num_total_trajectories, 2)) * fixed_action
+        fixed_agent = FixedAgent()
+        _, _, rewards = generate_trajectory(full_trajectory_env, fixed_agent)
+        mean_rewards = np.mean(rewards) * self.n_steps
+        return mean_rewards
 
     def seed(self, seed: int = None):
         self.rng = np.random.default_rng(seed)

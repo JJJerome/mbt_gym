@@ -48,7 +48,7 @@ class TradingEnvironment(gym.Env):
         max_depth: float = None,
         max_speed: float = None,
         half_spread: float = None,
-        random_start: Union[float, int, Callable] = 0.0,
+        start_time: Union[float, int, Callable] = 0.0,
         info_calculator: InfoCalculator = None,  # episode given as a proportion.
         seed: int = None,
         num_trajectories: int = 1,
@@ -75,7 +75,7 @@ class TradingEnvironment(gym.Env):
         self.rng = np.random.default_rng(seed)
         if seed:
             self.seed(seed)
-        self.start_time = random_start
+        self.start_time = start_time
         self.state = self.initial_state
         self.max_stock_price = max_stock_price or self.midprice_model.max_value[0, 0]
         self.max_cash = max_cash or self._get_max_cash()

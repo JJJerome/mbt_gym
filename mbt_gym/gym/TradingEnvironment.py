@@ -104,7 +104,7 @@ class TradingEnvironment(gym.Env):
             action = action.reshape(self.num_trajectories, self.action_space.shape[0])
         current_state = self.state.copy()
         next_state = self._update_state(action)
-        done = self.state[0, TIME_INDEX] >= self.terminal_time - self._step_size / 2
+        done = self.state[0, TIME_INDEX] >= self.terminal_time - self.step_size / 2
         dones = np.full((self.num_trajectories,), done, dtype=bool)
         rewards = self.reward_function.calculate(current_state, action, next_state, done)
         infos = (
@@ -143,20 +143,30 @@ class TradingEnvironment(gym.Env):
         return self._step_size
 
     @step_size.setter
-    def set_step_size(self, step_size: float):
+    def step_size(self, step_size: float, verbose:bool = True):
         self._step_size = step_size
-        for process in self.stochastic_processes.values():
-            process._step_size = step_size
+        for process_name, process in self.stochastic_processes.items():
+            if process.step_size != step_size:
+                if verbose:
+                    print(f"Setting value of {process_name}.step_size to {step_size}.")
+                process.step_size = step_size
+        if hasattr(self.reward_function, "step_size"):
+            if verbose:
+                print(f"Setting value of reward_function.step_size to {step_size}.")
+            self.reward_function.step_size = step_size
 
     @property
     def num_trajectories(self):
         return self._num_trajectories
 
     @num_trajectories.setter
-    def set_num_trajectories(self, num_trajectories: float):
+    def num_trajectories(self, num_trajectories: float, verbose: bool = True):
         self._num_trajectories = num_trajectories
-        for process in self.stochastic_processes.values():
-            process.num_trajectories = num_trajectories
+        for process_name, process in self.stochastic_processes.items():
+            if process.num_trajectories != num_trajectories:
+                if verbose:
+                    print(f"Setting value of {process_name}.num_trajectories to {num_trajectories}.")
+                process.num_trajectories = num_trajectories
 
     # The action space depends on the action_type but bids always precede asks for limit and market order actions.
     # state[0]=cash, state[1]=inventory, state[2]=time, state[3] = asset_price, and then remaining states depend on
@@ -199,11 +209,11 @@ class TradingEnvironment(gym.Env):
         if self.action_type in EXECUTION_ACTION_TYPES:
             price_impact = self.price_impact_model.get_impact(action)
             execution_price = self.midprice + price_impact
-            volume = action * self._step_size
+            volume = action * self.step_size
             self.state[:, CASH_INDEX] -= np.squeeze(volume * execution_price)
             self.state[:, INVENTORY_INDEX] += np.squeeze(volume)
         self._clip_inventory_and_cash()
-        self.state[:, TIME_INDEX] += self._step_size
+        self.state[:, TIME_INDEX] += self.step_size
 
     def _get_arrivals_and_fills(self, action: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         arrivals = self.arrival_model.get_arrivals()
@@ -283,7 +293,7 @@ class TradingEnvironment(gym.Env):
                 np.random.randint(
                     np.floor(self.random_start[0] * self.n_steps), np.ceil(self.random_start[1] * self.n_steps)
                 )
-                * self._step_size
+                * self.step_size
             )
         elif isinstance(self.random_start, (rv_continuous_frozen, rv_discrete_frozen)):
             random_start = self.random_start.rvs()
@@ -295,7 +305,7 @@ class TradingEnvironment(gym.Env):
 
     def _quantise_time_to_step(self, time: float):
         assert (time >= 0.0) and (time < self.terminal_time), "Start time is not within (0, env.terminal_time)."
-        return np.round(time / self._step_size) * self._step_size
+        return np.round(time / self.step_size) * self.step_size
 
     def _get_initial_inventories(self) -> np.ndarray:
         if isinstance(self.initial_inventory, tuple) and len(self.initial_inventory) == 2:
@@ -364,17 +374,17 @@ class TradingEnvironment(gym.Env):
     def _check_params(self):
         assert self.action_type in ACTION_TYPES
         for process in self.stochastic_processes.values():
-            assert np.isclose(process._step_size, self._step_size, atol=0.0, rtol=0.01), (
-                f"{type(self.midprice_model).__name__}.step_size = {process._step_size}, "
-                + f" but env.step_size = {self._step_size}"
+            assert np.isclose(process.step_size, self.step_size, atol=0.0, rtol=0.01), (
+                f"{type(self.midprice_model).__name__}.step_size = {process.step_size}, "
+                + f" but env.step_size = {self.step_size}"
             )
             assert process.num_trajectories == self.num_trajectories, (
                 "The stochastic processes given to an instance of TradingEnvironment must match the number of "
                 "trajectories specified."
             )
         if hasattr(self.reward_function, "step_size"):
-            assert np.isclose(self.reward_function.step_size, self._step_size, atol=0.0, rtol=0.01), (
-                f"Trading environment step size is {self._step_size} but reward function has "
+            assert np.isclose(self.reward_function.step_size, self.step_size, atol=0.0, rtol=0.01), (
+                f"Trading environment step size is {self.step_size} but reward function has "
                 + "step size = {self.reward_function.step_size}."
             )
 

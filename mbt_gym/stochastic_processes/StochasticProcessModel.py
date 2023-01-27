@@ -22,7 +22,6 @@ class StochasticProcessModel(metaclass=abc.ABCMeta):
         self.terminal_time = terminal_time
         self.num_trajectories = num_trajectories
         self.initial_state = initial_state
-        self.initial_vector_state = self._get_initial_vector_state()
         self._check_attribute_shapes()
         self.current_state = copy(self.initial_vector_state)
         self.rng = default_rng(seed)
@@ -46,7 +45,8 @@ class StochasticProcessModel(metaclass=abc.ABCMeta):
                 len(attribute.shape) == 2 and attribute.shape[0] == 1
             ), f"Attribute {name} must be a vector of shape (1, state_size)."
 
-    def _get_initial_vector_state(self) -> np.ndarray:
+    @property
+    def initial_vector_state(self) -> np.ndarray:
         initial_state = self.initial_state
         if isinstance(initial_state, list):
             initial_state = np.array([self.initial_state])

@@ -21,14 +21,12 @@ class StableBaselinesTradingEnvironment(VecEnv):
         normalise_action_space: bool = True,
         normalise_observation_space: bool = True,
         normalise_rewards: bool = False,
-        reward_normalisation_trajectories: int = 100_000,
     ):
         self.env = trading_env
         self.store_terminal_observation_info = store_terminal_observation_info
         self.normalise_action_space = normalise_action_space
         self.normalise_observation_space = normalise_observation_space
         self.normalise_rewards_ = normalise_rewards
-        self.reward_normalisation_trajectories = reward_normalisation_trajectories
         self.actions: np.ndarray = self.env.action_space.sample()
         if self.normalise_action_space:
             # We just do a linear normalisation of the gym.Box space so that the domain of the action space is [-1,1].
@@ -133,8 +131,8 @@ class StableBaselinesTradingEnvironment(VecEnv):
         fixed_agent = FixedActionAgent(fixed_action=np.array([fixed_action, fixed_action]), env=self.env)
         trajectory_rewards = []
         full_trajectory_env = deepcopy(self.env)
-        full_trajectory_env.random_start = 0.0
-        num_trajectories = int(self.reward_normalisation_trajectories / self.env.num_trajectories)
+        full_trajectory_env.start_time = 0.0
+        num_trajectories = int(100_000 / self.env.num_trajectories)
         for _ in range(num_trajectories):
             _, _, rewards = generate_trajectory(full_trajectory_env, fixed_agent)
             trajectory_rewards.append(np.mean(np.sum(rewards, axis=-1)))

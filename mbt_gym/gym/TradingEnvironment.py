@@ -5,7 +5,6 @@ import gym
 import numpy as np
 
 from gym.spaces import Box
-from scipy.stats._distn_infrastructure import rv_continuous_frozen, rv_discrete_frozen
 
 from mbt_gym.stochastic_processes.StochasticProcessModel import StochasticProcessModel
 from mbt_gym.stochastic_processes.arrival_models import ArrivalModel
@@ -49,7 +48,7 @@ class TradingEnvironment(gym.Env):
         max_depth: float = None,
         max_speed: float = None,
         half_spread: float = None,
-        random_start: Union[float, int, tuple, list, rv_discrete_frozen, rv_continuous_frozen, Callable] = 0.0,
+        random_start: Union[float, int, Callable] = 0.0,
         info_calculator: InfoCalculator = None,  # episode given as a proportion.
         seed: int = None,
         num_trajectories: int = 1,
@@ -76,7 +75,7 @@ class TradingEnvironment(gym.Env):
         self.rng = np.random.default_rng(seed)
         if seed:
             self.seed(seed)
-        self.random_start = random_start
+        self.start_time = random_start
         self.state = self.initial_state
         self.max_stock_price = max_stock_price or self.midprice_model.max_value[0, 0]
         self.max_cash = max_cash or self._get_max_cash()
@@ -116,9 +115,8 @@ class TradingEnvironment(gym.Env):
     def initial_state(self) -> np.ndarray:
         scalar_initial_state = np.array([[self.initial_cash, 0, 0.0]])
         initial_state = np.repeat(scalar_initial_state, self.num_trajectories, axis=0)
-        if self.random_start is not None:
-            random_start_time = self._get_random_start_time()
-            initial_state[:, TIME_INDEX] = random_start_time * np.ones((self.num_trajectories,))
+        start_time = self._get_start_time()
+        initial_state[:, TIME_INDEX] = start_time * np.ones((self.num_trajectories,))
         initial_state[:, INVENTORY_INDEX] = self._get_initial_inventories()
         for process in self.stochastic_processes.values():
             initial_state = np.append(initial_state, process.initial_vector_state, axis=1)
@@ -281,22 +279,11 @@ class TradingEnvironment(gym.Env):
             high = np.append(high, process.max_value)
         return Box(low=np.float32(low), high=np.float32(high))
 
-    def _get_random_start_time(self):
-        if isinstance(self.random_start, (float, int)):
-            random_start = self.random_start
-        elif isinstance(self.random_start, (tuple, list, np.ndarray)):
-            assert self.random_start[0] <= self.random_start[1], "Random start proportion min must be less than max."
-            assert self.random_start[0] > 0 and self.random_start[1] < 1, "Random start tuple must be in (0,1)."
-            random_start = (
-                np.random.randint(
-                    np.floor(self.random_start[0] * self.n_steps), np.ceil(self.random_start[1] * self.n_steps)
-                )
-                * self.step_size
-            )
-        elif isinstance(self.random_start, (rv_continuous_frozen, rv_discrete_frozen)):
-            random_start = self.random_start.rvs()
-        elif isinstance(self.random_start, Callable):
-            random_start = self.random_start()
+    def _get_start_time(self):
+        if isinstance(self.start_time, (float, int)):
+            random_start = self.start_time
+        elif isinstance(self.start_time, Callable):
+            random_start = self.start_time()
         else:
             raise NotImplementedError
         return self._quantise_time_to_step(random_start)

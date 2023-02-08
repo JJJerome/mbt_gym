@@ -104,7 +104,7 @@ def get_experiment_string(env):
         + f"phi_{phi}__"
         + f"alpha_{alpha}__"
         + f"initial_inventory_{env.initial_inventory}__"
-        + f"random_start_{env.random_start}"
+        + f"random_start_{env.start_time}"
     )
 
 

@@ -244,14 +244,20 @@ class TradingEnvironment(gym.Env):
             self.state[:, INVENTORY_INDEX] += mo_buy - mo_sell
         elif self.action_type == "touch":
             self.state[:, CASH_INDEX] += np.sum(
-                self._fill_multiplier * arrivals * fills * (self.midprice + self.fixed_market_half_spread * self._fill_multiplier),
+                self._fill_multiplier
+                * arrivals
+                * fills
+                * (self.midprice + self.fixed_market_half_spread * self._fill_multiplier),
                 axis=1,
             )
             self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self._fill_multiplier, axis=1)
         elif self.action_type in ["limit", "limit_and_market"]:
             self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self._fill_multiplier, axis=1)
             self.state[:, CASH_INDEX] += np.sum(
-                self._fill_multiplier * arrivals * fills * (self.midprice + self._limit_depths(action) * self._fill_multiplier),
+                self._fill_multiplier
+                * arrivals
+                * fills
+                * (self.midprice + self._limit_depths(action) * self._fill_multiplier),
                 axis=1,
             )
         if self.action_type in EXECUTION_ACTION_TYPES:
@@ -445,15 +451,17 @@ class TradingEnvironment(gym.Env):
         ones = np.ones((self.num_trajectories, 1))
         return np.append(-ones, ones, axis=1)
 
-    def _get_inventory_neutral_rewards(self, num_total_trajectories = 100_000):
+    def _get_inventory_neutral_rewards(self, num_total_trajectories=100_000):
         fixed_action = 1 / self.fill_probability_model.fill_exponent
         full_trajectory_env = deepcopy(self)
         full_trajectory_env.start_time = 0.0
         full_trajectory_env.num_trajectories = num_total_trajectories
         full_trajectory_env.normalise_rewards_ = False
+
         class FixedAgent(Agent):
-            def get_action(self, obs:np.ndarray) -> np.ndarray:
+            def get_action(self, obs: np.ndarray) -> np.ndarray:
                 return np.ones((num_total_trajectories, 2)) * fixed_action
+
         fixed_agent = FixedAgent()
         _, _, rewards = generate_trajectory(full_trajectory_env, fixed_agent)
         mean_rewards = np.mean(rewards) * self.n_steps

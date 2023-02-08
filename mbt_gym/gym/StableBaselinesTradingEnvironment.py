@@ -13,13 +13,11 @@ class StableBaselinesTradingEnvironment(VecEnv):
         self,
         trading_env: TradingEnvironment,
         store_terminal_observation_info: bool = True,
-
     ):
         self.env = trading_env
         self.store_terminal_observation_info = store_terminal_observation_info
         self.actions: np.ndarray = self.env.action_space.sample()
         super().__init__(self.env.num_trajectories, self.env.observation_space, self.env.action_space)
-
 
     def reset(self) -> VecEnvObs:
         return self.env.reset()

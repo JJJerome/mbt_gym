@@ -223,8 +223,6 @@ class TradingEnvironment(gym.Env):
             arrivals, fills = self._get_arrivals_and_fills(action)
         else:
             arrivals, fills = None, None
-        if self.action_type in EXECUTION_ACTION_TYPES:
-            action = self._get_execution_action(action)
         self._update_agent_state(arrivals, fills, action)
         self._update_market_state(arrivals, fills, action)
         return self.state
@@ -362,9 +360,6 @@ class TradingEnvironment(gym.Env):
             low=-np.ones_like(self.action_space.low, dtype=np.float32),
             high=np.ones_like(self.action_space.high, dtype=np.float32),
         )
-
-    def _get_execution_action(self, action: np.ndarray) -> np.ndarray:
-        return np.sign(action) * min(np.abs(action), np.abs(self.state[:, INVENTORY_INDEX]))
 
     def _get_start_time(self):
         if isinstance(self.start_time, (float, int)):

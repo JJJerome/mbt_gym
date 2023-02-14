@@ -136,19 +136,19 @@ def create_inventory_plot(
             action = normalised_env.normalise_action(action, inverse=True)
         bid_action, ask_action = action
         cj_bid_action, cj_ask_action = cj_agent.get_action(state).reshape(-1)
-        
+
         if inventory == min_inventory:
             ask_action = np.NaN
             cj_ask_action = np.NaN
         if inventory == max_inventory:
             bid_action = np.NaN
             cj_bid_action = np.NaN
-        
+
         bid_actions.append(bid_action)
         ask_actions.append(ask_action)
         cj_bid_actions.append(cj_bid_action)
         cj_ask_actions.append(cj_ask_action)
-        
+
     plt.plot(inventories, bid_actions, label="bid", color="k")
     plt.plot(inventories, ask_actions, label="ask", color="r")
     plt.plot(inventories, cj_bid_actions, label="bid cj", color="k", linestyle="--")
@@ -175,7 +175,7 @@ def create_time_plot(
         normalised_env = StableBaselinesTradingEnvironment(ReduceStateSizeWrapper(env, reduced_training_indices))
     assert env.num_trajectories == 1, "Plotting actions must be done with a single trajectory env"
     ppo_agent = SbAgent(model)
-    cj_agent = CarteaJaimungalMmAgent(env=env, max_inventory = max_inventory)
+    cj_agent = CarteaJaimungalMmAgent(env=env, max_inventory=max_inventory)
     inventories = np.arange(min_inventory, max_inventory + 1, 1)
     times = np.arange(0, env.terminal_time + 0.01, 0.01)
     inventory_dict = {inventory: [] for inventory in inventories}
@@ -195,19 +195,18 @@ def create_time_plot(
             if model_uses_normalisation:
                 action = normalised_env.normalise_action(action, inverse=True)
             bid_action, ask_action = action
-            
+
             cj_actions = cj_agent.get_action(state)
-            cj_bid_action = cj_actions[0,0]
-            cj_ask_action = cj_actions[0,1]
-            
-            
+            cj_bid_action = cj_actions[0, 0]
+            cj_ask_action = cj_actions[0, 1]
+
             if inventory == min_inventory:
                 ask_action = np.NaN
                 cj_ask_action = np.NaN
             if inventory == max_inventory:
                 bid_action = np.NaN
                 cj_bid_action = np.NaN
-            
+
             action_dict["rl bid actions"][inventory].append(bid_action)
             action_dict["rl ask actions"][inventory].append(ask_action)
             action_dict["cj bid actions"][inventory].append(cj_bid_action)

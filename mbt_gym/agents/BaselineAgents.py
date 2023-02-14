@@ -182,8 +182,9 @@ class CarteaJaimungalOeAgent(Agent):
         # Algorithmic and High-Frequency Trading
         # Cambridge University Press
         gamma = np.sqrt(self.phi / self.temporary_price_impact)
-        zeta = self.alpha - 0.5 * self.permanent_price_impact + np.sqrt(self.temporary_price_impact * self.phi)
-        zeta /= self.alpha - 0.5 * self.permanent_price_impact - np.sqrt(self.temporary_price_impact * self.phi)
+        zeta = (self.alpha - 0.5 * self.permanent_price_impact + np.sqrt(self.temporary_price_impact * self.phi)) / (
+            self.alpha - 0.5 * self.permanent_price_impact - np.sqrt(self.temporary_price_impact * self.phi)
+        )
         initial_inventory = self.env.initial_inventory
 
         time_left = self.terminal_time - state[0, TIME_INDEX]

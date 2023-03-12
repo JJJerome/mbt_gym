@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from copy import copy, deepcopy
-from typing import Union, Tuple, Callable, Optional
+from typing import Union, Tuple, Callable
 
 import gym
 import numpy as np
@@ -8,6 +8,7 @@ import numpy as np
 from gym.spaces import Box
 
 from mbt_gym.agents.Agent import Agent
+from mbt_gym.gym.Traders import Trader, LimitOrderTrader
 from mbt_gym.gym.helpers.generate_trajectory import generate_trajectory
 from mbt_gym.stochastic_processes.StochasticProcessModel import StochasticProcessModel
 from mbt_gym.stochastic_processes.arrival_models import ArrivalModel, PoissonArrivalModel
@@ -17,10 +18,9 @@ from mbt_gym.stochastic_processes.price_impact_models import PriceImpactModel
 from mbt_gym.gym.info_calculators import InfoCalculator
 from mbt_gym.rewards.RewardFunctions import RewardFunction, PnL
 
-MARKET_MAKING_ACTION_TYPES = ["touch", "limit", "limit_and_market"]
-EXECUTION_ACTION_TYPES = ["speed"]
-ACTION_TYPES = MARKET_MAKING_ACTION_TYPES + EXECUTION_ACTION_TYPES
 
+
+# DELETE FROM HERE
 CASH_INDEX = 0
 INVENTORY_INDEX = 1
 TIME_INDEX = 2
@@ -42,7 +42,7 @@ class TradingEnvironment(gym.Env):
         arrival_model: ArrivalModel = None,
         fill_probability_model: FillProbabilityModel = None,
         price_impact_model: PriceImpactModel = None,
-        action_type: str = "limit",
+        trader: Trader = None,
         initial_cash: float = 0.0,
         initial_inventory: Union[int, Tuple[float, float]] = 0,  # Either a deterministic initial inventory, or a tuple
         max_inventory: int = 10_000,  # representing the mean and variance of it.
@@ -69,8 +69,11 @@ class TradingEnvironment(gym.Env):
         self.arrival_model = arrival_model
         self.fill_probability_model = fill_probability_model
         self.price_impact_model = price_impact_model
-        self.action_type = action_type
-        self._check_required_stochastic_processes()
+        self.trader = trader or LimitOrderTrader(
+            midprice_model = midprice_model, arrival_model = arrival_model, 
+            fill_probability_model = fill_probability_model, price_impact_model = price_impact_model,
+            num_trajectories = num_trajectories, seed = seed, max_depth = max_depth)
+        self._assign_stochastic_processes_to_trader()
         self.stochastic_processes = self._get_stochastic_processes()
         self.stochastic_process_indices = self._get_stochastic_process_indices()
         self.num_trajectories = num_trajectories
@@ -85,14 +88,12 @@ class TradingEnvironment(gym.Env):
         self.state = self.initial_state
         self.max_stock_price = max_stock_price or self.midprice_model.max_value[0, 0]
         self.max_cash = max_cash or self._get_max_cash()
-        self.max_depth = max_depth or self._get_max_depth()
-        self.max_speed = max_speed or self._get_max_speed()
         self.fixed_market_half_spread = fixed_market_half_spread
         self.info_calculator = info_calculator
         self._empty_infos = self._get_empty_infos()
         self._fill_multiplier = self._get_fill_multiplier()
         self.observation_space = self._get_observation_space()
-        self.action_space = self._get_action_space()
+        self.action_space = self.trader.get_action_space()
         self.normalise_action_space_ = normalise_action_space
         self.normalise_observation_space_ = normalise_observation_space
         self.normalise_rewards_ = normalise_rewards
@@ -170,10 +171,6 @@ class TradingEnvironment(gym.Env):
         return self.state[:, INVENTORY_INDEX] <= -self.max_inventory
 
     @property
-    def midprice(self):
-        return self.midprice_model.current_state[:, 0].reshape(-1, 1)
-
-    @property
     def step_size(self):
         return self._step_size
 
@@ -215,14 +212,12 @@ class TradingEnvironment(gym.Env):
     def _gradient_action_norm(self):
         return (self.original_action_space.high - self.original_action_space.low) / 2
 
-    # The action space depends on the action_type but bids always precede asks for limit and market order actions.
     # state[0]=cash, state[1]=inventory, state[2]=time, state[3] = asset_price, and then remaining states depend on
     # the dimensionality of the arrival process, the midprice process and the fill probability process.
     def _update_state(self, action: np.ndarray) -> np.ndarray:
-        if self.action_type in MARKET_MAKING_ACTION_TYPES:
-            arrivals, fills = self._get_arrivals_and_fills(action)
-        else:
-            arrivals, fills = None, None
+        arrivals, fills = self.trader.get_arrivals_and_fills(action)
+        if fills is not None:
+            fills = self._remove_max_inventory_fills(fills)
         self._update_agent_state(arrivals, fills, action)
         self._update_market_state(arrivals, fills, action)
         return self.state
@@ -235,96 +230,12 @@ class TradingEnvironment(gym.Env):
             self.state[:, lower_index:upper_index] = process.current_state
 
     def _update_agent_state(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
-        if self.action_type == "limit_and_market":
-            mo_buy = np.single(self._market_order_buy(action) > 0.5)
-            mo_sell = np.single(self._market_order_sell(action) > 0.5)
-            best_bid = self.midprice - self.fixed_market_half_spread
-            best_ask = self.midprice + self.fixed_market_half_spread
-            self.state[:, CASH_INDEX] += mo_sell * best_bid - mo_buy * best_ask
-            self.state[:, INVENTORY_INDEX] += mo_buy - mo_sell
-        elif self.action_type == "touch":
-            self.state[:, CASH_INDEX] += np.sum(
-                self._fill_multiplier
-                * arrivals
-                * fills
-                * (self.midprice + self.fixed_market_half_spread * self._fill_multiplier),
-                axis=1,
-            )
-            self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self._fill_multiplier, axis=1)
-        elif self.action_type in ["limit", "limit_and_market"]:
-            self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self._fill_multiplier, axis=1)
-            self.state[:, CASH_INDEX] += np.sum(
-                self._fill_multiplier
-                * arrivals
-                * fills
-                * (self.midprice + self._limit_depths(action) * self._fill_multiplier),
-                axis=1,
-            )
-        if self.action_type in EXECUTION_ACTION_TYPES:
-            price_impact = self.price_impact_model.get_impact(action)
-            execution_price = self.midprice + price_impact
-            volume = action * self.step_size
-            self.state[:, CASH_INDEX] -= np.squeeze(volume * execution_price)
-            self.state[:, INVENTORY_INDEX] += np.squeeze(volume)
+        self.trader.update_state(self.state, arrivals, fills, action)
         self._clip_inventory_and_cash()
         self.state[:, TIME_INDEX] += self.step_size
 
-    def _get_arrivals_and_fills(self, action: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        arrivals = self.arrival_model.get_arrivals()
-        if self.action_type in ["limit", "limit_and_market"]:
-            depths = self._limit_depths(action)
-            fills = self.fill_probability_model.get_fills(depths)
-        elif self.action_type == "touch":
-            fills = self._post_at_touch(action)
-        else:
-            raise NotImplementedError
-        fills = self._remove_max_inventory_fills(fills)
-        return arrivals, fills
-
-    def _remove_max_inventory_fills(self, fills: np.ndarray) -> np.ndarray:
-        fill_multiplier = np.concatenate(
-            ((1 - self.is_at_max_inventory).reshape(-1, 1), (1 - self.is_at_min_inventory).reshape(-1, 1)), axis=1
-        )
-        return fill_multiplier * fills
-
-    def _limit_depths(self, action: np.ndarray):
-        if self.action_type in ["limit", "limit_and_market"]:
-            return action[:, 0:2]
-        else:
-            raise Exception('Bid depth only exists for action_type in ["limit", "limit_and_market"].')
-
-    def _market_order_buy(self, action: np.ndarray):
-        if self.action_type == "limit_and_market":
-            return action[:, 2]
-        else:
-            raise Exception('Market order buy action only exists for action_type == "limit_and_market".')
-
-    def _market_order_sell(self, action: np.ndarray):
-        if self.action_type == "limit_and_market":
-            return action[:, 3]
-        else:
-            raise Exception('Market order sell action only exists for action_type == "limit_and_market".')
-
-    def _post_at_touch(self, action: np.ndarray):
-        if self.action_type == "touch":
-            return action[:, 0:2]
-        else:
-            raise Exception('Post buy at touch action only exists for action_type == "touch".')
-
     def _get_max_cash(self) -> float:
         return self.n_steps * self.max_stock_price  # TODO: make this a tighter bound
-
-    def _get_max_depth(self) -> Optional[float]:
-        if self.fill_probability_model is not None:
-            return self.fill_probability_model.max_depth
-        else:
-            return None
-
-    def _get_max_speed(self) -> float:
-        if self.price_impact_model is not None:
-            return self.price_impact_model.max_speed
-        else:
-            return None
 
     def _get_observation_space(self) -> gym.spaces.Space:
         """The observation space consists of a numpy array containg the agent's cash, the agent's inventory and the
@@ -336,22 +247,6 @@ class TradingEnvironment(gym.Env):
             low = np.append(low, process.min_value)
             high = np.append(high, process.max_value)
         return Box(low=np.float32(low), high=np.float32(high))
-
-    def _get_action_space(self) -> gym.spaces.Space:
-        if self.action_type == "touch":
-            return gym.spaces.MultiBinary(2)  # agent chooses spread on bid and ask
-        elif self.action_type == "limit":
-            assert self.max_depth is not None, "For limit orders max_depth cannot be None."
-            # agent chooses spread on bid and ask
-            return gym.spaces.Box(low=np.float32(0.0), high=np.float32(self.max_depth), shape=(2,))
-        elif self.action_type == "limit_and_market":
-            return gym.spaces.Box(
-                low=np.zeros(4),
-                high=np.array([self.max_depth, self.max_depth, 1, 1], dtype=np.float32),
-            )
-        elif self.action_type == "speed":
-            # agent chooses speed of trading: positive buys, negative sells
-            return gym.spaces.Box(low=np.float32([-self.max_speed]), high=np.float32([self.max_speed]))
 
     def _get_normalised_observation_space(self):
         # Linear normalisation of the gym.Box space so that the domain of the observation space is [-1,1].
@@ -387,7 +282,7 @@ class TradingEnvironment(gym.Env):
             return self.initial_inventory * np.ones((self.num_trajectories,))
         elif isinstance(self.initial_inventory, Callable):
             initial_inventory = self.initial_inventory()
-            if self.action_type not in EXECUTION_ACTION_TYPES:
+            if self.trader.round_initial_inventory:
                 initial_inventory = int(np.round(initial_inventory))
             return initial_inventory
         else:
@@ -411,22 +306,6 @@ class TradingEnvironment(gym.Env):
     def _clamp(probability):
         return max(min(probability, 1), 0)
 
-    def _check_required_stochastic_processes(self) -> None:
-        assert self.action_type in ACTION_TYPES, f"Action type '{self.action_type}' is not in {ACTION_TYPES}."
-        if self.action_type == "touch":
-            processes = ["arrival_model"]
-        elif self.action_type in ["limit", "limit_and_market"]:
-            processes = ["arrival_model", "fill_probability_model"]
-        elif self.action_type == "speed":
-            processes = ["price_impact_model"]
-        else:
-            raise NotImplementedError
-        for process in processes:
-            self._check_process_is_not_none(process)
-
-    def _check_process_is_not_none(self, process: str):
-        assert getattr(self, process) is not None, f"Action type is '{self.action_type}' but env.{process} is None."
-
     def _get_stochastic_processes(self):
         stochastic_processes = dict()
         for process_name in ["midprice_model", "arrival_model", "fill_probability_model", "price_impact_model"]:
@@ -444,12 +323,24 @@ class TradingEnvironment(gym.Env):
             count += dimension
         return OrderedDict(process_indices)
 
+    def _assign_stochastic_processes_to_trader(self):
+        self.trader.midprice_model = self.midprice_model
+        self.trader.arrival_model = self.arrival_model
+        self.trader.fill_probability_model = self.fill_probability_model
+        self.trader.price_impact_model = self.price_impact_model
+
     def _get_empty_infos(self):
         return [{} for _ in range(self.num_trajectories)] if self.num_trajectories > 1 else {}
 
     def _get_fill_multiplier(self):
         ones = np.ones((self.num_trajectories, 1))
         return np.append(-ones, ones, axis=1)
+
+    def _remove_max_inventory_fills(self, fills: np.ndarray) -> np.ndarray:
+        fill_multiplier = np.concatenate(
+            ((1 - self.is_at_max_inventory).reshape(-1, 1), (1 - self.is_at_min_inventory).reshape(-1, 1)), axis=1
+        )
+        return fill_multiplier * fills
 
     def _get_inventory_neutral_rewards(self, num_total_trajectories=100_000):
         fixed_action = 1 / self.fill_probability_model.fill_exponent

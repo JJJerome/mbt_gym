@@ -10,7 +10,7 @@ from mbt_gym.gym.TradingEnvironment import TradingEnvironment
 from mbt_gym.gym.hyperparameters import INVENTORY_INDEX, TIME_INDEX, BID_INDEX, ASK_INDEX
 from mbt_gym.rewards.RewardFunctions import CjMmCriterion, PnL
 from mbt_gym.stochastic_processes.price_impact_models import PriceImpactModel, TemporaryAndPermanentPriceImpact
-
+from mbt_gym.gym.Traders import LimitOrderTrader, TradinghWithSpeedTrader
 
 class RandomAgent(Agent):
     def __init__(self, env: gym.Env, seed: int = None):
@@ -60,8 +60,8 @@ class AvellanedaStoikovAgent(Agent):
         self.fill_exponent = self.env.fill_probability_model.fill_exponent
 
     def get_action(self, state: np.ndarray):
-        inventory = state[:, 1]
-        time = state[:, 2]
+        inventory = state[:, INVENTORY_INDEX]
+        time = state[:, TIME_INDEX]
         action = self._get_action(inventory, time)
         if action.min() < 0:
             warnings.warn("Avellaneda-Stoikov agent is quoting a negative spread")
@@ -90,7 +90,7 @@ class CarteaJaimungalMmAgent(Agent):
         max_inventory: int = 100,
     ):
         self.env = env or TradingEnvironment()
-        assert self.env.action_type == "limit"
+        assert isinstance(self.env.trader, LimitOrderTrader), "Trader must be type LimitOrderTrader"
         assert isinstance(self.env.reward_function, (CjMmCriterion, PnL)), "Reward function for CjMmAgent is incorrect."
         self.kappa = self.env.fill_probability_model.fill_exponent
         self.num_trajectories = self.env.num_trajectories
@@ -171,7 +171,7 @@ class CarteaJaimungalOeAgent(Agent):
         self.alpha = alpha
         self.env = env or TradingEnvironment()
         self.price_impact_model = env.price_impact_model
-        assert self.env.action_type == "speed"
+        assert isinstance(self.env.trader, TradinghWithSpeedTrader), "Trader must be type TradinghWithSpeedTrader"
         self.terminal_time = self.env.terminal_time
         self.temporary_price_impact = self.price_impact_model.temporary_impact_coefficient
         self.permanent_price_impact = self.price_impact_model.permanent_impact_coefficient

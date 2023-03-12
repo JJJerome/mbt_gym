@@ -2,7 +2,7 @@ import abc
 import gym
 from copy import copy
 from typing import Optional
-
+        
 import numpy as np
 from numpy.random import default_rng
 
@@ -244,3 +244,38 @@ class LimitAndMarketOrderTrader(Trader):
         depths = self._limit_depths(action)
         fills = self.fill_probability_model.get_fills(depths)
         return arrivals, fills
+
+
+class TradinghWithSpeedTrader(Trader):
+    """Trader for 'speed'."""
+    def __init__(
+        self,
+        midprice_model : MidpriceModel  = None,
+        price_impact_model : PriceImpactModel = None,
+        num_trajectories: int = 1,
+        seed: int = None,
+        max_speed : float = None,
+    ):
+        super().__init__(midprice_model = midprice_model,
+                        price_impact_model = price_impact_model,
+                        num_trajectories = num_trajectories,
+                        seed = seed)
+        self.max_speed = max_speed or self._get_max_speed()
+        self.required_processes = self.get_required_stochastic_processes()
+        self._check_processes_are_not_none(self.required_processes)
+        self.round_initial_inventory = False
+
+    def update_state(self, state: np.ndarray, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
+        price_impact = self.price_impact_model.get_impact(action)
+        execution_price = self.midprice + price_impact
+        volume = action * self.midprice_model.step_size
+        state[:, CASH_INDEX] -= np.squeeze(volume * execution_price)
+        state[:, INVENTORY_INDEX] += np.squeeze(volume)
+
+    def get_action_space(self) -> gym.spaces.Space:
+        # agent chooses speed of trading: positive buys, negative sells
+        return gym.spaces.Box(low=np.float32([-self.max_speed]), high=np.float32([self.max_speed]))
+    
+    def get_required_stochastic_processes(self):
+        processes = ["price_impact_model"]
+        return processes

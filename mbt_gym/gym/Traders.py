@@ -79,7 +79,7 @@ class Trader(metaclass=abc.ABCMeta):
             self._check_process_is_not_none(process)
 
     def _check_process_is_not_none(self, process: str):
-        assert getattr(self, process) is not None, f"Action type is '{self.action_type}' but env.{process} is None."
+        assert getattr(self, process) is not None, f"This trader cannot have env.{process} to be None."
 
     @property
     def midprice(self):

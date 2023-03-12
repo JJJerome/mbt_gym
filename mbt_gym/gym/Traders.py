@@ -6,13 +6,8 @@ from typing import Optional
 import numpy as np
 from numpy.random import default_rng
 
-CASH_INDEX = 0
-INVENTORY_INDEX = 1
-TIME_INDEX = 2
-ASSET_PRICE_INDEX = 3
 
-BID_INDEX = 0
-ASK_INDEX = 1
+from mbt_gym.gym.hyperparameters import CASH_INDEX, INVENTORY_INDEX, BID_INDEX, ASK_INDEX
 
 from gym.spaces import Box
 

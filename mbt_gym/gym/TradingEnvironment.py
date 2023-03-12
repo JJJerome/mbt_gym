@@ -18,13 +18,7 @@ from mbt_gym.stochastic_processes.price_impact_models import PriceImpactModel
 from mbt_gym.gym.info_calculators import InfoCalculator
 from mbt_gym.rewards.RewardFunctions import RewardFunction, PnL
 
-CASH_INDEX = 0
-INVENTORY_INDEX = 1
-TIME_INDEX = 2
-ASSET_PRICE_INDEX = 3
-
-BID_INDEX = 0
-ASK_INDEX = 1
+from mbt_gym.gym.hyperparameters import CASH_INDEX, INVENTORY_INDEX, TIME_INDEX
 
 
 class TradingEnvironment(gym.Env):

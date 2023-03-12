@@ -6,7 +6,8 @@ import warnings
 from scipy.linalg import expm
 
 from mbt_gym.agents.Agent import Agent
-from mbt_gym.gym.TradingEnvironment import TradingEnvironment, INVENTORY_INDEX, TIME_INDEX, BID_INDEX, ASK_INDEX
+from mbt_gym.gym.TradingEnvironment import TradingEnvironment
+from mbt_gym.gym.hyperparameters import INVENTORY_INDEX, TIME_INDEX, BID_INDEX, ASK_INDEX
 from mbt_gym.rewards.RewardFunctions import CjMmCriterion, PnL
 from mbt_gym.stochastic_processes.price_impact_models import PriceImpactModel, TemporaryAndPermanentPriceImpact
 

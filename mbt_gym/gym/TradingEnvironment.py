@@ -48,9 +48,6 @@ class TradingEnvironment(gym.Env):
         max_inventory: int = 10_000,  # representing the mean and variance of it.
         max_cash: float = None,
         max_stock_price: float = None,
-        max_depth: float = None,
-        max_speed: float = None,
-        fixed_market_half_spread: float = None,
         start_time: Union[float, int, Callable] = 0.0,
         info_calculator: InfoCalculator = None,  # episode given as a proportion.
         seed: int = None,
@@ -72,7 +69,7 @@ class TradingEnvironment(gym.Env):
         self.trader = trader or LimitOrderTrader(
             midprice_model = midprice_model, arrival_model = arrival_model, 
             fill_probability_model = fill_probability_model, price_impact_model = price_impact_model,
-            num_trajectories = num_trajectories, seed = seed, max_depth = max_depth)
+            num_trajectories = num_trajectories, seed = seed)
         self._assign_stochastic_processes_to_trader()
         self.stochastic_processes = self._get_stochastic_processes()
         self.stochastic_process_indices = self._get_stochastic_process_indices()
@@ -88,7 +85,6 @@ class TradingEnvironment(gym.Env):
         self.state = self.initial_state
         self.max_stock_price = max_stock_price or self.midprice_model.max_value[0, 0]
         self.max_cash = max_cash or self._get_max_cash()
-        self.fixed_market_half_spread = fixed_market_half_spread
         self.info_calculator = info_calculator
         self._empty_infos = self._get_empty_infos()
         self._fill_multiplier = self._get_fill_multiplier()

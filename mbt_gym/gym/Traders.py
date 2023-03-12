@@ -44,6 +44,9 @@ class Trader(metaclass=abc.ABCMeta):
         self.seed_ = seed
         self._fill_multiplier = self._get_fill_multiplier()
         self.round_initial_inventory = False
+        self.required_processes = self.get_required_stochastic_processes()
+        self._check_processes_are_not_none(self.required_processes)
+        
 
     def update_state(self, state: np.ndarray, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
         pass
@@ -91,8 +94,6 @@ class Trader(metaclass=abc.ABCMeta):
         return self.midprice_model.current_state[:, 0].reshape(-1, 1)
 
 
-
-## The first trader 'limit'
 class LimitOrderTrader(Trader):
     """Trader for 'limit'."""
     def __init__(
@@ -100,7 +101,6 @@ class LimitOrderTrader(Trader):
         midprice_model : MidpriceModel  = None,
         arrival_model : ArrivalModel  = None,
         fill_probability_model : FillProbabilityModel  = None,
-        price_impact_model : PriceImpactModel = None,
         num_trajectories: int = 1,
         seed: int = None,
         max_depth : float = None,
@@ -108,7 +108,6 @@ class LimitOrderTrader(Trader):
         super().__init__(midprice_model = midprice_model,
                         arrival_model = arrival_model,
                         fill_probability_model = fill_probability_model, 
-                        price_impact_model = price_impact_model,
                         num_trajectories = num_trajectories,
                         seed = seed)
         self.max_depth = max_depth or self._get_max_depth()
@@ -125,11 +124,6 @@ class LimitOrderTrader(Trader):
                 * (self.midprice + self._limit_depths(action) * self._fill_multiplier),
                 axis=1,
             )
-        
-    def get_fills(self, action: np.ndarray, fill_probability_model: FillProbabilityModel):
-        depths = self._limit_depths(action)
-        fills = fill_probability_model.get_fills(depths)
-        return fills
 
     def get_action_space(self) -> gym.spaces.Space:
         assert self.max_depth is not None, "For limit orders max_depth cannot be None."
@@ -144,4 +138,49 @@ class LimitOrderTrader(Trader):
         arrivals = self.arrival_model.get_arrivals()
         depths = self._limit_depths(action)
         fills = self.fill_probability_model.get_fills(depths)
+        return arrivals, fills
+
+
+class AtTheTouchTrader(Trader):
+    """Trader for 'touch'."""
+    def __init__(
+        self,
+        midprice_model : MidpriceModel  = None,
+        arrival_model : ArrivalModel  = None,
+        fill_probability_model : FillProbabilityModel  = None,
+        num_trajectories: int = 1,
+        fixed_market_half_spread: float = 0.5,
+        seed: int = None,
+    ):
+        super().__init__(midprice_model = midprice_model,
+                        arrival_model = arrival_model,
+                        fill_probability_model = fill_probability_model, 
+                        num_trajectories = num_trajectories,
+                        seed = seed)
+        self.round_initial_inventory = True
+        self.fixed_market_half_spread = fixed_market_half_spread
+        
+    def update_state(self, state: np.ndarray, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
+        state[:, CASH_INDEX] += np.sum(
+                self._fill_multiplier
+                * arrivals
+                * fills
+                * (self.midprice + self.fixed_market_half_spread * self._fill_multiplier),
+                axis=1,
+            )
+        state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self._fill_multiplier, axis=1)
+
+    def _post_at_touch(self, action: np.ndarray):
+        return action[:, 0:2]
+
+    def get_action_space(self) -> gym.spaces.Space:
+        return gym.spaces.MultiBinary(2) 
+    
+    def get_required_stochastic_processes(self):
+        processes = ["arrival_model"]
+        return processes
+
+    def get_arrivals_and_fills(self, action: np.ndarray):
+        arrivals = self.arrival_model.get_arrivals()
+        fills = self._post_at_touch(action)
         return arrivals, fills

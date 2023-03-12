@@ -3,10 +3,8 @@ import gym
 from copy import copy
 from typing import Optional
 
-
 import numpy as np
 from numpy.random import default_rng
-
 
 CASH_INDEX = 0
 INVENTORY_INDEX = 1
@@ -15,7 +13,6 @@ ASSET_PRICE_INDEX = 3
 
 BID_INDEX = 0
 ASK_INDEX = 1
-
 
 from gym.spaces import Box
 
@@ -183,4 +180,67 @@ class AtTheTouchTrader(Trader):
     def get_arrivals_and_fills(self, action: np.ndarray):
         arrivals = self.arrival_model.get_arrivals()
         fills = self._post_at_touch(action)
+        return arrivals, fills
+
+class LimitAndMarketOrderTrader(Trader):
+    """Trader for 'limit_and_market'."""
+    def __init__(
+        self,
+        midprice_model : MidpriceModel  = None,
+        arrival_model : ArrivalModel  = None,
+        fill_probability_model : FillProbabilityModel  = None,
+        num_trajectories: int = 1,
+        seed: int = None,
+        max_depth : float = None,
+        fixed_market_half_spread : float = 0.5,
+    ):
+        super().__init__(midprice_model = midprice_model,
+                        arrival_model = arrival_model,
+                        fill_probability_model = fill_probability_model, 
+                        num_trajectories = num_trajectories,
+                        seed = seed)
+        self.max_depth = max_depth or self._get_max_depth()
+        self.fixed_market_half_spread = fixed_market_half_spread
+        self.required_processes = self.get_required_stochastic_processes()
+        self._check_processes_are_not_none(self.required_processes)
+        self.round_initial_inventory = True
+
+    def _market_order_buy(self, action: np.ndarray):
+        return action[:, 2 + BID_INDEX]
+        
+    def _market_order_sell(self, action: np.ndarray):
+        return action[:, 2 + ASK_INDEX]
+
+    def update_state(self, state: np.ndarray, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
+        mo_buy = np.single(self._market_order_buy(action) > 0.5)
+        mo_sell = np.single(self._market_order_sell(action) > 0.5)
+        best_bid = (self.midprice - self.fixed_market_half_spread).reshape(-1,)
+        best_ask = (self.midprice + self.fixed_market_half_spread).reshape(-1,)
+        state[:, CASH_INDEX] += mo_sell * best_bid - mo_buy * best_ask
+        state[:, INVENTORY_INDEX] += mo_buy - mo_sell
+        state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self._fill_multiplier, axis=1)
+        state[:, CASH_INDEX] += np.sum(
+                self._fill_multiplier
+                * arrivals
+                * fills
+                * (self.midprice + self._limit_depths(action) * self._fill_multiplier),
+                axis=1,
+            )
+
+    def get_action_space(self) -> gym.spaces.Space:
+        assert self.max_depth is not None, "For limit orders max_depth cannot be None."
+        # agent chooses spread on bid and ask
+        return gym.spaces.Box(
+                low=np.zeros(4),
+                high=np.array([self.max_depth, self.max_depth, 1, 1], dtype=np.float32),
+            )
+    
+    def get_required_stochastic_processes(self):
+        processes = ["arrival_model", "fill_probability_model"]
+        return processes
+
+    def get_arrivals_and_fills(self, action: np.ndarray):
+        arrivals = self.arrival_model.get_arrivals()
+        depths = self._limit_depths(action)
+        fills = self.fill_probability_model.get_fills(depths)
         return arrivals, fills

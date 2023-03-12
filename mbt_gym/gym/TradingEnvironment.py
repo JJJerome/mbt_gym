@@ -18,9 +18,6 @@ from mbt_gym.stochastic_processes.price_impact_models import PriceImpactModel
 from mbt_gym.gym.info_calculators import InfoCalculator
 from mbt_gym.rewards.RewardFunctions import RewardFunction, PnL
 
-
-
-# DELETE FROM HERE
 CASH_INDEX = 0
 INVENTORY_INDEX = 1
 TIME_INDEX = 2
@@ -220,7 +217,7 @@ class TradingEnvironment(gym.Env):
 
     def _update_market_state(self, arrivals, fills, action):
         for process_name, process in self.stochastic_processes.items():
-            process.update(arrivals, fills, action)
+            process.update(arrivals, fills, action, self.state)
             lower_index = self.stochastic_process_indices[process_name][0]
             upper_index = self.stochastic_process_indices[process_name][1]
             self.state[:, lower_index:upper_index] = process.current_state

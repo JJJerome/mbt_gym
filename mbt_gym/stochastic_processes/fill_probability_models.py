@@ -61,7 +61,7 @@ class ExponentialFillFunction(FillProbabilityModel):
     def max_depth(self) -> float:
         return -np.log(0.01) / self.fill_exponent
 
-    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray):
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray, state: np.ndarray = None):
         pass
 
 
@@ -87,7 +87,7 @@ class TriangularFillFunction(FillProbabilityModel):
     def max_depth(self) -> float:
         return 1.5 * self.max_fill_depth
 
-    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray):
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray, state: np.ndarray = None):
         pass
 
 
@@ -119,7 +119,7 @@ class PowerFillFunction(FillProbabilityModel):
     def max_depth(self) -> float:
         return 0.01 ** (-1 / self.fill_exponent) - 1
 
-    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray):
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray, state: np.ndarray = None):
         pass
 
 
@@ -165,6 +165,6 @@ class ExogenousMmFillProbabilityModel(FillProbabilityModel):
     def max_depth(self) -> float:
         return -np.log(0.01) / self.fill_exponent + np.max(self.exogenous_best_depth_processes[0].max_value)
 
-    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray):
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray, state: np.ndarray = None):
         for process in self.exogenous_best_depth_processes:
             process.update(arrivals, fills, actions)

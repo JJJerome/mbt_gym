@@ -31,7 +31,7 @@ class StochasticProcessModel(metaclass=abc.ABCMeta):
         self.current_state = self.initial_vector_state
 
     @abc.abstractmethod
-    def update(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray, state: np.ndarray = None):
         pass
 
     def seed(self, seed: int = None):

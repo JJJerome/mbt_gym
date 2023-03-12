@@ -50,7 +50,7 @@ class TemporaryPowerPriceImpact(PriceImpactModel):
             seed=None,
         )
 
-    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray):
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray, state: np.ndarray = None):
         pass
 
     def get_impact(self, action) -> np.ndarray:
@@ -85,7 +85,7 @@ class TemporaryAndPermanentPriceImpact(PriceImpactModel):
             seed=None,
         )
 
-    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray):
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray, state: np.ndarray = None):
         self.current_state = self.current_state + self.permanent_impact_coefficient * actions * self.step_size
 
     def get_impact(self, action) -> np.ndarray:

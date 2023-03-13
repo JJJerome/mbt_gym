@@ -154,9 +154,9 @@ class CarteaJaimungalMmAgent(Agent):
             Amatrix[i, i] = -self.phi * self.kappa * inventory**2
             z_vector[i, 0] = np.exp(-self.alpha * self.kappa * inventory**2)
             if i + 1 < matrix_size:
-                Amatrix[i, i + 1] = self.lambdas[0] * np.exp(-1)
+                Amatrix[i, i + 1] = self.lambdas[BID_INDEX] * np.exp(-1)
             if i > 0:
-                Amatrix[i, i - 1] = self.lambdas[1] * np.exp(-1)
+                Amatrix[i, i - 1] = self.lambdas[ASK_INDEX] * np.exp(-1)
         return Amatrix, z_vector
 
 

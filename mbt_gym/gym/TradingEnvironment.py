@@ -72,7 +72,6 @@ class TradingEnvironment(gym.Env):
         self.max_cash = max_cash or self._get_max_cash()
         self.info_calculator = info_calculator
         self._empty_infos = self._get_empty_infos()
-        self._fill_multiplier = self._get_fill_multiplier()
         self.observation_space = self._get_observation_space()
         self.action_space = self.model_dynamics.get_action_space()
         self.normalise_action_space_ = normalise_action_space
@@ -179,7 +178,7 @@ class TradingEnvironment(gym.Env):
             if process.num_trajectories != num_trajectories:
                 process.num_trajectories = num_trajectories
         self._empty_infos = self._get_empty_infos()
-        self._fill_multiplier = self._get_fill_multiplier()
+        self.model_dynamics.fill_multiplier = self.model_dynamics._get_fill_multiplier()
 
     @property
     def _intercept_obs_norm(self):
@@ -310,10 +309,6 @@ class TradingEnvironment(gym.Env):
 
     def _get_empty_infos(self):
         return [{} for _ in range(self.num_trajectories)] if self.num_trajectories > 1 else {}
-
-    def _get_fill_multiplier(self):
-        ones = np.ones((self.num_trajectories, 1))
-        return np.append(-ones, ones, axis=1)
 
     def _remove_max_inventory_fills(self, fills: np.ndarray) -> np.ndarray:
         fill_multiplier = np.concatenate(

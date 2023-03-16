@@ -10,7 +10,7 @@ from mbt_gym.gym.TradingEnvironment import TradingEnvironment
 from mbt_gym.gym.index_names import INVENTORY_INDEX, TIME_INDEX, BID_INDEX, ASK_INDEX
 from mbt_gym.rewards.RewardFunctions import CjMmCriterion, PnL
 from mbt_gym.stochastic_processes.price_impact_models import PriceImpactModel, TemporaryAndPermanentPriceImpact
-from mbt_gym.gym.ModelDynamics import LimitOrderTrader, TradinghWithSpeedTrader
+from mbt_gym.gym.ModelDynamics import LimitOrderModelDynamics, TradinghWithSpeedModelDynamics
 
 class RandomAgent(Agent):
     def __init__(self, env: gym.Env, seed: int = None):
@@ -55,9 +55,9 @@ class AvellanedaStoikovAgent(Agent):
         self.env = env or TradingEnvironment()
         assert isinstance(self.env, TradingEnvironment)
         self.terminal_time = self.env.terminal_time
-        self.volatility = self.env.midprice_model.volatility
-        self.rate_of_arrival = self.env.arrival_model.intensity
-        self.fill_exponent = self.env.fill_probability_model.fill_exponent
+        self.volatility = self.env.model_dynamics.midprice_model.volatility
+        self.rate_of_arrival = self.env.model_dynamics.arrival_model.intensity
+        self.fill_exponent = self.env.model_dynamics.fill_probability_model.fill_exponent
 
     def get_action(self, state: np.ndarray):
         inventory = state[:, INVENTORY_INDEX]
@@ -90,9 +90,9 @@ class CarteaJaimungalMmAgent(Agent):
         max_inventory: int = 100,
     ):
         self.env = env or TradingEnvironment()
-        assert isinstance(self.env.trader, LimitOrderTrader), "Trader must be type LimitOrderTrader"
+        assert isinstance(self.env.model_dynamics, LimitOrderModelDynamics), "Trader must be type LimitOrderTrader"
         assert isinstance(self.env.reward_function, (CjMmCriterion, PnL)), "Reward function for CjMmAgent is incorrect."
-        self.kappa = self.env.fill_probability_model.fill_exponent
+        self.kappa = self.env.model_dynamics.fill_probability_model.fill_exponent
         self.num_trajectories = self.env.num_trajectories
         if isinstance(self.env.reward_function, PnL):
             self.inventory_neutral = True
@@ -103,7 +103,7 @@ class CarteaJaimungalMmAgent(Agent):
             self.alpha = env.reward_function.terminal_inventory_aversion
             assert self.env.reward_function.inventory_exponent == 2.0, "Inventory exponent must be = 2."
             self.terminal_time = self.env.terminal_time
-            self.lambdas = self.env.arrival_model.intensity
+            self.lambdas = self.env.model_dynamics.arrival_model.intensity
             self.max_inventory = max_inventory
             self.a_matrix, self.z_vector = self._calculate_a_and_z()
             self.large_depth = 10_000
@@ -170,8 +170,8 @@ class CarteaJaimungalOeAgent(Agent):
         self.phi = phi
         self.alpha = alpha
         self.env = env or TradingEnvironment()
-        self.price_impact_model = env.price_impact_model
-        assert isinstance(self.env.trader, TradinghWithSpeedTrader), "Trader must be type TradinghWithSpeedTrader"
+        self.price_impact_model = env.model_dynamics.price_impact_model
+        assert isinstance(self.env.model_dynamics, TradinghWithSpeedModelDynamics), "Trader must be type TradinghWithSpeedTrader"
         self.terminal_time = self.env.terminal_time
         self.temporary_price_impact = self.price_impact_model.temporary_impact_coefficient
         self.permanent_price_impact = self.price_impact_model.permanent_impact_coefficient

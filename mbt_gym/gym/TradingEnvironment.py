@@ -46,7 +46,8 @@ class TradingEnvironment(gym.Env):
         super(TradingEnvironment, self).__init__()
         self.terminal_time = terminal_time
         self.n_steps = n_steps
-        self.reward_function = reward_function or PnL()
+        self._step_size = self.terminal_time / self.n_steps
+        self.reward_function = reward_function or PnL()        
         self.model_dynamics = model_dynamics or LimitOrderModelDynamics(
             midprice_model = BrownianMotionMidpriceModel(
                 step_size=self._step_size, num_trajectories=num_trajectories, seed= seed), 
@@ -59,7 +60,6 @@ class TradingEnvironment(gym.Env):
         self.stochastic_processes = self._get_stochastic_processes()
         self.stochastic_process_indices = self._get_stochastic_process_indices()
         self.num_trajectories = num_trajectories
-        self.step_size = self.terminal_time / self.n_steps
         self.initial_cash = initial_cash
         self.initial_inventory = initial_inventory
         self.max_inventory = max_inventory
@@ -67,7 +67,7 @@ class TradingEnvironment(gym.Env):
             self.seed(seed)
         self.rng = np.random.default_rng(seed)
         self.start_time = start_time
-        self.state = self.initial_state
+        self.model_dynamics.state = self.initial_state
         self.max_stock_price = max_stock_price or self.model_dynamics.midprice_model.max_value[0, 0]
         self.max_cash = max_cash or self._get_max_cash()
         self.info_calculator = info_calculator
@@ -93,17 +93,17 @@ class TradingEnvironment(gym.Env):
     def reset(self):
         for process in self.stochastic_processes.values():
             process.reset()
-        self.state = self.initial_state
-        self.reward_function.reset(self.state.copy())
-        return self.normalise_observation(self.state.copy())
+        self.model_dynamics.state = self.initial_state
+        self.reward_function.reset(self.model_dynamics.state.copy())
+        return self.normalise_observation(self.model_dynamics.state.copy())
 
     def step(self, action: np.ndarray):
         if action.shape != (self.num_trajectories, self.action_space.shape[0]):
             action = action.reshape(self.num_trajectories, self.action_space.shape[0])
         action = self.normalise_action(action, inverse=True)
-        current_state = self.state.copy()
+        current_state = self.model_dynamics.state.copy()
         next_state = self._update_state(action)
-        done = self.state[0, TIME_INDEX] >= self.terminal_time - self.step_size / 2
+        done = self.model_dynamics.state[0, TIME_INDEX] >= self.terminal_time - self.step_size / 2
         dones = np.full((self.num_trajectories,), done, dtype=bool)
         rewards = self.reward_function.calculate(current_state, action, next_state, done)
         infos = (
@@ -142,6 +142,10 @@ class TradingEnvironment(gym.Env):
         for process in self.stochastic_processes.values():
             initial_state = np.append(initial_state, process.initial_vector_state, axis=1)
         return initial_state
+
+    @property
+    def state(self):
+        return self.model_dynamics.state
 
     @property
     def is_at_max_inventory(self):
@@ -201,19 +205,19 @@ class TradingEnvironment(gym.Env):
             fills = self._remove_max_inventory_fills(fills)
         self._update_agent_state(arrivals, fills, action)
         self._update_market_state(arrivals, fills, action)
-        return self.state
+        return self.model_dynamics.state
 
     def _update_market_state(self, arrivals, fills, action):
         for process_name, process in self.stochastic_processes.items():
-            process.update(arrivals, fills, action, self.state)
+            process.update(arrivals, fills, action, self.model_dynamics.state)
             lower_index = self.stochastic_process_indices[process_name][0]
             upper_index = self.stochastic_process_indices[process_name][1]
-            self.state[:, lower_index:upper_index] = process.current_state
+            self.model_dynamics.state[:, lower_index:upper_index] = process.current_state
 
     def _update_agent_state(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
-        self.model_dynamics.update_state(self.state, arrivals, fills, action)
+        self.model_dynamics.update_state(arrivals, fills, action)
         self._clip_inventory_and_cash()
-        self.state[:, TIME_INDEX] += self.step_size
+        self.model_dynamics.state[:, TIME_INDEX] += self.step_size
 
     def _get_max_cash(self) -> float:
         return self.n_steps * self.max_stock_price  # TODO: make this a tighter bound
@@ -270,10 +274,10 @@ class TradingEnvironment(gym.Env):
             raise Exception("Initial inventory must be a tuple of length 2 or an int.")
 
     def _clip_inventory_and_cash(self):
-        self.state[:, INVENTORY_INDEX] = self._clip(
-            self.state[:, INVENTORY_INDEX], -self.max_inventory, self.max_inventory, cash_flag=False
+        self.model_dynamics.state[:, INVENTORY_INDEX] = self._clip(
+            self.model_dynamics.state[:, INVENTORY_INDEX], -self.max_inventory, self.max_inventory, cash_flag=False
         )
-        self.state[:, CASH_INDEX] = self._clip(self.state[:, CASH_INDEX], -self.max_cash, self.max_cash, cash_flag=True)
+        self.model_dynamics.state[:, CASH_INDEX] = self._clip(self.model_dynamics.state[:, CASH_INDEX], -self.max_cash, self.max_cash, cash_flag=True)
 
     def _clip(self, not_clipped: float, min: float, max: float, cash_flag: bool) -> float:
         clipped = np.clip(not_clipped, min, max)

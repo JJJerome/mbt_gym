@@ -9,8 +9,6 @@ from numpy.random import default_rng
 
 from mbt_gym.gym.index_names import CASH_INDEX, INVENTORY_INDEX, BID_INDEX, ASK_INDEX
 
-from gym.spaces import Box
-
 from mbt_gym.stochastic_processes.arrival_models import ArrivalModel
 from mbt_gym.stochastic_processes.fill_probability_models import FillProbabilityModel
 from mbt_gym.stochastic_processes.midprice_models import MidpriceModel
@@ -38,9 +36,9 @@ class ModelDynamics(metaclass=abc.ABCMeta):
         self.round_initial_inventory = False
         self.required_processes = self.get_required_stochastic_processes()
         self._check_processes_are_not_none(self.required_processes)
-        
+        self.state = None
 
-    def update_state(self, state: np.ndarray, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
+    def update_state(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
         pass
     
     def get_fills(self, action: np.ndarray):
@@ -107,9 +105,9 @@ class LimitOrderModelDynamics(ModelDynamics):
         self._check_processes_are_not_none(self.required_processes)
         self.round_initial_inventory = True
         
-    def update_state(self, state: np.ndarray, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
-        state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self._fill_multiplier, axis=1)
-        state[:, CASH_INDEX] += np.sum(
+    def update_state(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
+        self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self._fill_multiplier, axis=1)
+        self.state[:, CASH_INDEX] += np.sum(
                 self._fill_multiplier
                 * arrivals
                 * fills
@@ -152,15 +150,15 @@ class AtTheTouchModelDynamics(ModelDynamics):
         self.round_initial_inventory = True
         self.fixed_market_half_spread = fixed_market_half_spread
         
-    def update_state(self, state: np.ndarray, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
-        state[:, CASH_INDEX] += np.sum(
+    def update_state(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
+        self.state[:, CASH_INDEX] += np.sum(
                 self._fill_multiplier
                 * arrivals
                 * fills
                 * (self.midprice + self.fixed_market_half_spread * self._fill_multiplier),
                 axis=1,
             )
-        state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self._fill_multiplier, axis=1)
+        self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self._fill_multiplier, axis=1)
 
     def _post_at_touch(self, action: np.ndarray):
         return action[:, 0:2]
@@ -207,15 +205,15 @@ class LimitAndMarketOrderModelDynamics(ModelDynamics):
     def _market_order_sell(self, action: np.ndarray):
         return action[:, 2 + ASK_INDEX]
 
-    def update_state(self, state: np.ndarray, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
+    def update_state(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
         mo_buy = np.single(self._market_order_buy(action) > 0.5)
         mo_sell = np.single(self._market_order_sell(action) > 0.5)
         best_bid = (self.midprice - self.fixed_market_half_spread).reshape(-1,)
         best_ask = (self.midprice + self.fixed_market_half_spread).reshape(-1,)
-        state[:, CASH_INDEX] += mo_sell * best_bid - mo_buy * best_ask
-        state[:, INVENTORY_INDEX] += mo_buy - mo_sell
-        state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self._fill_multiplier, axis=1)
-        state[:, CASH_INDEX] += np.sum(
+        self.state[:, CASH_INDEX] += mo_sell * best_bid - mo_buy * best_ask
+        self.state[:, INVENTORY_INDEX] += mo_buy - mo_sell
+        self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self._fill_multiplier, axis=1)
+        self.state[:, CASH_INDEX] += np.sum(
                 self._fill_multiplier
                 * arrivals
                 * fills
@@ -261,12 +259,12 @@ class TradinghWithSpeedModelDynamics(ModelDynamics):
         self._check_processes_are_not_none(self.required_processes)
         self.round_initial_inventory = False
 
-    def update_state(self, state: np.ndarray, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
+    def update_state(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
         price_impact = self.price_impact_model.get_impact(action)
         execution_price = self.midprice + price_impact
         volume = action * self.midprice_model.step_size
-        state[:, CASH_INDEX] -= np.squeeze(volume * execution_price)
-        state[:, INVENTORY_INDEX] += np.squeeze(volume)
+        self.state[:, CASH_INDEX] -= np.squeeze(volume * execution_price)
+        self.state[:, INVENTORY_INDEX] += np.squeeze(volume)
 
     def get_action_space(self) -> gym.spaces.Space:
         # agent chooses speed of trading: positive buys, negative sells

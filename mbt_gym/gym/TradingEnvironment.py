@@ -8,7 +8,7 @@ import numpy as np
 from gym.spaces import Box
 
 from mbt_gym.agents.Agent import Agent
-from mbt_gym.gym.Traders import Trader, LimitOrderTrader
+from mbt_gym.gym.ModelDynamics import ModelDynamics, LimitOrderModelDynamics
 from mbt_gym.gym.helpers.generate_trajectory import generate_trajectory
 from mbt_gym.stochastic_processes.StochasticProcessModel import StochasticProcessModel
 from mbt_gym.stochastic_processes.arrival_models import ArrivalModel, PoissonArrivalModel
@@ -18,7 +18,7 @@ from mbt_gym.stochastic_processes.price_impact_models import PriceImpactModel
 from mbt_gym.gym.info_calculators import InfoCalculator
 from mbt_gym.rewards.RewardFunctions import RewardFunction, PnL
 
-from mbt_gym.gym.hyperparameters import CASH_INDEX, INVENTORY_INDEX, TIME_INDEX
+from mbt_gym.gym.index_names import CASH_INDEX, INVENTORY_INDEX, TIME_INDEX
 
 
 class TradingEnvironment(gym.Env):
@@ -29,11 +29,7 @@ class TradingEnvironment(gym.Env):
         terminal_time: float = 1.0,
         n_steps: int = 20 * 10,
         reward_function: RewardFunction = None,
-        midprice_model: MidpriceModel = None,
-        arrival_model: ArrivalModel = None,
-        fill_probability_model: FillProbabilityModel = None,
-        price_impact_model: PriceImpactModel = None,
-        trader: Trader = None,
+        model_dynamics: ModelDynamics = None,
         initial_cash: float = 0.0,
         initial_inventory: Union[int, Tuple[float, float]] = 0,  # Either a deterministic initial inventory, or a tuple
         max_inventory: int = 10_000,  # representing the mean and variance of it.
@@ -51,17 +47,15 @@ class TradingEnvironment(gym.Env):
         self.terminal_time = terminal_time
         self.n_steps = n_steps
         self.reward_function = reward_function or PnL()
-        self.midprice_model = midprice_model or BrownianMotionMidpriceModel(
-            step_size=self._step_size, num_trajectories=num_trajectories
-        )
-        self.arrival_model = arrival_model
-        self.fill_probability_model = fill_probability_model
-        self.price_impact_model = price_impact_model
-        self.trader = trader or LimitOrderTrader(
-            midprice_model = midprice_model, arrival_model = arrival_model, 
-            fill_probability_model = fill_probability_model, price_impact_model = price_impact_model,
+        self.model_dynamics = model_dynamics or LimitOrderModelDynamics(
+            midprice_model = BrownianMotionMidpriceModel(
+                step_size=self._step_size, num_trajectories=num_trajectories, seed= seed), 
+            arrival_model = PoissonArrivalModel(
+                intensity = np.array([100, 100]), step_size= self._step_size, 
+                num_trajectories=num_trajectories, seed = seed), 
+            fill_probability_model = ExponentialFillFunction(
+                step_size= self._step_size, num_trajectories=num_trajectories, seed = seed), 
             num_trajectories = num_trajectories, seed = seed)
-        self._assign_stochastic_processes_to_trader()
         self.stochastic_processes = self._get_stochastic_processes()
         self.stochastic_process_indices = self._get_stochastic_process_indices()
         self.num_trajectories = num_trajectories
@@ -74,13 +68,13 @@ class TradingEnvironment(gym.Env):
         self.rng = np.random.default_rng(seed)
         self.start_time = start_time
         self.state = self.initial_state
-        self.max_stock_price = max_stock_price or self.midprice_model.max_value[0, 0]
+        self.max_stock_price = max_stock_price or self.model_dynamics.midprice_model.max_value[0, 0]
         self.max_cash = max_cash or self._get_max_cash()
         self.info_calculator = info_calculator
         self._empty_infos = self._get_empty_infos()
         self._fill_multiplier = self._get_fill_multiplier()
         self.observation_space = self._get_observation_space()
-        self.action_space = self.trader.get_action_space()
+        self.action_space = self.model_dynamics.get_action_space()
         self.normalise_action_space_ = normalise_action_space
         self.normalise_observation_space_ = normalise_observation_space
         self.normalise_rewards_ = normalise_rewards
@@ -91,8 +85,8 @@ class TradingEnvironment(gym.Env):
             self.original_action_space = copy(self.action_space)
             self.action_space = self._get_normalised_action_space()
         if self.normalise_rewards_:
-            assert isinstance(self.arrival_model, PoissonArrivalModel) and isinstance(
-                self.fill_probability_model, ExponentialFillFunction
+            assert isinstance(self.model_dynamics.arrival_model, PoissonArrivalModel) and isinstance(
+                self.model_dynamics.fill_probability_model, ExponentialFillFunction
             ), "Arrival model must be Poisson and fill probability model must be exponential to scale rewards"
             self.reward_scaling = 1 / self._get_inventory_neutral_rewards()
 
@@ -202,7 +196,7 @@ class TradingEnvironment(gym.Env):
     # state[0]=cash, state[1]=inventory, state[2]=time, state[3] = asset_price, and then remaining states depend on
     # the dimensionality of the arrival process, the midprice process and the fill probability process.
     def _update_state(self, action: np.ndarray) -> np.ndarray:
-        arrivals, fills = self.trader.get_arrivals_and_fills(action)
+        arrivals, fills = self.model_dynamics.get_arrivals_and_fills(action)
         if fills is not None:
             fills = self._remove_max_inventory_fills(fills)
         self._update_agent_state(arrivals, fills, action)
@@ -217,7 +211,7 @@ class TradingEnvironment(gym.Env):
             self.state[:, lower_index:upper_index] = process.current_state
 
     def _update_agent_state(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
-        self.trader.update_state(self.state, arrivals, fills, action)
+        self.model_dynamics.update_state(self.state, arrivals, fills, action)
         self._clip_inventory_and_cash()
         self.state[:, TIME_INDEX] += self.step_size
 
@@ -269,7 +263,7 @@ class TradingEnvironment(gym.Env):
             return self.initial_inventory * np.ones((self.num_trajectories,))
         elif isinstance(self.initial_inventory, Callable):
             initial_inventory = self.initial_inventory()
-            if self.trader.round_initial_inventory:
+            if self.model_dynamics.round_initial_inventory:
                 initial_inventory = int(np.round(initial_inventory))
             return initial_inventory
         else:
@@ -296,7 +290,7 @@ class TradingEnvironment(gym.Env):
     def _get_stochastic_processes(self):
         stochastic_processes = dict()
         for process_name in ["midprice_model", "arrival_model", "fill_probability_model", "price_impact_model"]:
-            process: StochasticProcessModel = getattr(self, process_name)
+            process: StochasticProcessModel = getattr(self.model_dynamics, process_name)
             if process is not None:
                 stochastic_processes[process_name] = process
         return OrderedDict(stochastic_processes)
@@ -309,12 +303,6 @@ class TradingEnvironment(gym.Env):
             process_indices[process_name] = (count, count + dimension)
             count += dimension
         return OrderedDict(process_indices)
-
-    def _assign_stochastic_processes_to_trader(self):
-        self.trader.midprice_model = self.midprice_model
-        self.trader.arrival_model = self.arrival_model
-        self.trader.fill_probability_model = self.fill_probability_model
-        self.trader.price_impact_model = self.price_impact_model
 
     def _get_empty_infos(self):
         return [{} for _ in range(self.num_trajectories)] if self.num_trajectories > 1 else {}
@@ -330,7 +318,7 @@ class TradingEnvironment(gym.Env):
         return fill_multiplier * fills
 
     def _get_inventory_neutral_rewards(self, num_total_trajectories=100_000):
-        fixed_action = 1 / self.fill_probability_model.fill_exponent
+        fixed_action = 1 / self.model_dynamics.fill_probability_model.fill_exponent
         full_trajectory_env = deepcopy(self)
         full_trajectory_env.start_time = 0.0
         full_trajectory_env.num_trajectories = num_total_trajectories

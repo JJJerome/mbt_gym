@@ -7,7 +7,7 @@ from mbt_gym.stochastic_processes.StochasticProcessModel import StochasticProces
 
 MidpriceModel = StochasticProcessModel
 
-from mbt_gym.gym.hyperparameters import BID_INDEX, ASK_INDEX
+from mbt_gym.gym.index_names import BID_INDEX, ASK_INDEX
 
 class ConstantMidpriceModel(MidpriceModel):
     def __init__(

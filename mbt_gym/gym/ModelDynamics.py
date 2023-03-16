@@ -7,7 +7,7 @@ import numpy as np
 from numpy.random import default_rng
 
 
-from mbt_gym.gym.hyperparameters import CASH_INDEX, INVENTORY_INDEX, BID_INDEX, ASK_INDEX
+from mbt_gym.gym.index_names import CASH_INDEX, INVENTORY_INDEX, BID_INDEX, ASK_INDEX
 
 from gym.spaces import Box
 
@@ -17,7 +17,7 @@ from mbt_gym.stochastic_processes.midprice_models import MidpriceModel
 from mbt_gym.stochastic_processes.price_impact_models import PriceImpactModel
 
 
-class Trader(metaclass=abc.ABCMeta):
+class ModelDynamics(metaclass=abc.ABCMeta):
     def __init__(
         self,
         midprice_model : MidpriceModel  = None,
@@ -79,15 +79,15 @@ class Trader(metaclass=abc.ABCMeta):
             self._check_process_is_not_none(process)
 
     def _check_process_is_not_none(self, process: str):
-        assert getattr(self, process) is not None, f"This trader cannot have env.{process} to be None."
+        assert getattr(self, process) is not None, f"This model dynamics cannot have env.{process} to be None."
 
     @property
     def midprice(self):
         return self.midprice_model.current_state[:, 0].reshape(-1, 1)
 
 
-class LimitOrderTrader(Trader):
-    """Trader for 'limit'."""
+class LimitOrderModelDynamics(ModelDynamics):
+    """ModelDynamics for 'limit'."""
     def __init__(
         self,
         midprice_model : MidpriceModel  = None,
@@ -133,8 +133,8 @@ class LimitOrderTrader(Trader):
         return arrivals, fills
 
 
-class AtTheTouchTrader(Trader):
-    """Trader for 'touch'."""
+class AtTheTouchModelDynamics(ModelDynamics):
+    """ModelDynamics for 'touch'."""
     def __init__(
         self,
         midprice_model : MidpriceModel  = None,
@@ -177,8 +177,9 @@ class AtTheTouchTrader(Trader):
         fills = self._post_at_touch(action)
         return arrivals, fills
 
-class LimitAndMarketOrderTrader(Trader):
-    """Trader for 'limit_and_market'."""
+
+class LimitAndMarketOrderModelDynamics(ModelDynamics):
+    """ModelDynamics for 'limit_and_market'."""
     def __init__(
         self,
         midprice_model : MidpriceModel  = None,
@@ -241,8 +242,8 @@ class LimitAndMarketOrderTrader(Trader):
         return arrivals, fills
 
 
-class TradinghWithSpeedTrader(Trader):
-    """Trader for 'speed'."""
+class TradinghWithSpeedModelDynamics(ModelDynamics):
+    """ModelDynamics for 'speed'."""
     def __init__(
         self,
         midprice_model : MidpriceModel  = None,

@@ -2,7 +2,7 @@ import gym
 
 import numpy as np
 
-from mbt_gym.gym.hyperparameters import INVENTORY_INDEX, TIME_INDEX
+from mbt_gym.gym.index_names import INVENTORY_INDEX, TIME_INDEX
 
 from math import sqrt
 

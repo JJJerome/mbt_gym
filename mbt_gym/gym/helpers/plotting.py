@@ -7,7 +7,7 @@ import seaborn as sns
 
 from mbt_gym.agents.Agent import Agent
 from mbt_gym.gym.TradingEnvironment import TradingEnvironment 
-from mbt_gym.gym.index_names import CASH_INDEX, INVENTORY_INDEX
+from mbt_gym.gym.index_names import CASH_INDEX, INVENTORY_INDEX, ASSET_PRICE_INDEX
 from mbt_gym.gym.helpers.generate_trajectory import generate_trajectory
 
 

@@ -16,7 +16,7 @@ from mbt_gym.rewards.RewardFunctions import CjMmCriterion, PnL
 from mbt_gym.stochastic_processes.arrival_models import PoissonArrivalModel
 from mbt_gym.stochastic_processes.fill_probability_models import ExponentialFillFunction
 from mbt_gym.stochastic_processes.midprice_models import BrownianMotionMidpriceModel
-
+from mbt_gym.gym.ModelDynamics import LimitAndMarketOrderModelDynamics
 
 def get_cj_env(
     num_trajectories: int = 1,
@@ -33,23 +33,25 @@ def get_cj_env(
     n_steps = int(10 * terminal_time * arrival_rate)
     step_size = 1 / n_steps
     reward_function = CjMmCriterion(phi, alpha) if phi > 0 or alpha > 0 else PnL()
-    env_params = dict(
-        terminal_time=terminal_time,
-        n_steps=n_steps,
-        initial_inventory=initial_inventory,
-        midprice_model=BrownianMotionMidpriceModel(
+    midprice_model=BrownianMotionMidpriceModel(
             volatility=sigma,
             terminal_time=terminal_time,
             step_size=step_size,
             initial_price=initial_price,
             num_trajectories=num_trajectories,
-        ),
-        arrival_model=PoissonArrivalModel(
-            intensity=np.array([arrival_rate, arrival_rate]), step_size=step_size, num_trajectories=num_trajectories
-        ),
-        fill_probability_model=ExponentialFillFunction(
-            fill_exponent=fill_exponent, step_size=step_size, num_trajectories=num_trajectories
-        ),
+        )
+    arrival_model=PoissonArrivalModel(
+        intensity=np.array([arrival_rate, arrival_rate]), step_size=step_size, num_trajectories=num_trajectories
+    )
+    fill_probability_model=ExponentialFillFunction(
+        fill_exponent=fill_exponent, step_size=step_size, num_trajectories=num_trajectories
+    )
+    env_params = dict(
+        terminal_time=terminal_time,
+        n_steps=n_steps,
+        model_dynamics = LimitAndMarketOrderModelDynamics(midprice_model = midprice_model, arrival_model= arrival_model, fill_probability_model = fill_probability_model, 
+                                                          num_trajectories = num_trajectories),
+        initial_inventory=initial_inventory,
         reward_function=reward_function,
         max_inventory=n_steps,
         num_trajectories=num_trajectories,

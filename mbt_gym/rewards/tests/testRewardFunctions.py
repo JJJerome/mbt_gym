@@ -4,7 +4,7 @@ from unittest import TestCase, main
 import numpy as np
 
 from mbt_gym.rewards.RewardFunctions import RunningInventoryPenalty, PnL, CjMmCriterion
-from mbt_gym.gym.TradingEnvironment import CASH_INDEX, INVENTORY_INDEX, TIME_INDEX, ASSET_PRICE_INDEX
+from mbt_gym.gym.index_names import CASH_INDEX, INVENTORY_INDEX, TIME_INDEX, ASSET_PRICE_INDEX
 
 STEP_SIZE = 0.2
 TEST_CURRENT_STATE = np.array([[120, 2, 0.5, 100]])

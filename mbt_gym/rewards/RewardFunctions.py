@@ -2,11 +2,7 @@ import abc
 from typing import Union
 
 import numpy as np
-
-CASH_INDEX = 0
-INVENTORY_INDEX = 1
-TIME_INDEX = 2
-ASSET_PRICE_INDEX = 3
+from mbt_gym.gym.index_names import CASH_INDEX, INVENTORY_INDEX, TIME_INDEX, ASSET_PRICE_INDEX
 
 
 class RewardFunction(metaclass=abc.ABCMeta):

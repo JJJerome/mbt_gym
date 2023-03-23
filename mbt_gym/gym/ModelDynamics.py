@@ -32,7 +32,7 @@ class ModelDynamics(metaclass=abc.ABCMeta):
         self.num_trajectories = num_trajectories
         self.rng = default_rng(seed)
         self.seed_ = seed
-        self._fill_multiplier = self._get_fill_multiplier()
+        self.fill_multiplier = self._get_fill_multiplier()
         self.round_initial_inventory = False
         self.required_processes = self.get_required_stochastic_processes()
         self._check_processes_are_not_none(self.required_processes)
@@ -106,12 +106,12 @@ class LimitOrderModelDynamics(ModelDynamics):
         self.round_initial_inventory = True
         
     def update_state(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
-        self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self._fill_multiplier, axis=1)
+        self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self.fill_multiplier, axis=1)
         self.state[:, CASH_INDEX] += np.sum(
-                self._fill_multiplier
+                self.fill_multiplier
                 * arrivals
                 * fills
-                * (self.midprice + self._limit_depths(action) * self._fill_multiplier),
+                * (self.midprice + self._limit_depths(action) * self.fill_multiplier),
                 axis=1,
             )
 
@@ -152,13 +152,13 @@ class AtTheTouchModelDynamics(ModelDynamics):
         
     def update_state(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
         self.state[:, CASH_INDEX] += np.sum(
-                self._fill_multiplier
+                self.fill_multiplier
                 * arrivals
                 * fills
-                * (self.midprice + self.fixed_market_half_spread * self._fill_multiplier),
+                * (self.midprice + self.fixed_market_half_spread * self.fill_multiplier),
                 axis=1,
             )
-        self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self._fill_multiplier, axis=1)
+        self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self.fill_multiplier, axis=1)
 
     def _post_at_touch(self, action: np.ndarray):
         return action[:, 0:2]
@@ -212,12 +212,12 @@ class LimitAndMarketOrderModelDynamics(ModelDynamics):
         best_ask = (self.midprice + self.fixed_market_half_spread).reshape(-1,)
         self.state[:, CASH_INDEX] += mo_sell * best_bid - mo_buy * best_ask
         self.state[:, INVENTORY_INDEX] += mo_buy - mo_sell
-        self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self._fill_multiplier, axis=1)
+        self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self.fill_multiplier, axis=1)
         self.state[:, CASH_INDEX] += np.sum(
-                self._fill_multiplier
+                self.fill_multiplier
                 * arrivals
                 * fills
-                * (self.midprice + self._limit_depths(action) * self._fill_multiplier),
+                * (self.midprice + self._limit_depths(action) * self.fill_multiplier),
                 axis=1,
             )
 

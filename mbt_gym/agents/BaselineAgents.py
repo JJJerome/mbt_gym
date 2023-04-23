@@ -7,7 +7,7 @@ from scipy.linalg import expm
 
 from mbt_gym.agents.Agent import Agent
 from mbt_gym.gym.TradingEnvironment import TradingEnvironment
-from mbt_gym.gym.index_names import INVENTORY_INDEX, TIME_INDEX, BID_INDEX, ASK_INDEX
+from mbt_gym.gym.index_names import INVENTORY_INDEX, TIME_INDEX, ASSET_PRICE_INDEX, CASH_INDEX, BID_INDEX, ASK_INDEX
 from mbt_gym.rewards.RewardFunctions import CjMmCriterion, PnL
 from mbt_gym.stochastic_processes.price_impact_models import PriceImpactModel, TemporaryAndPermanentPriceImpact
 from mbt_gym.gym.ModelDynamics import LimitOrderModelDynamics, TradinghWithSpeedModelDynamics
@@ -158,6 +158,17 @@ class CarteaJaimungalMmAgent(Agent):
             if i > 0:
                 Amatrix[i, i - 1] = self.lambdas[ASK_INDEX] * np.exp(-1)
         return Amatrix, z_vector
+    
+    def calculate_true_value_function(self, state: np.ndarray):
+        current_time = state[0, TIME_INDEX]
+        inventories = state[:, INVENTORY_INDEX]
+        value_fct = np.zeros(shape=(self.num_trajectories, 1))
+        h_t = self._calculate_ht(current_time)
+        indices = np.clip(self.max_inventory + inventories, 0, 2 * self.max_inventory)
+        indices = indices.astype(int)
+        h_0 = h_t[indices]
+        value_fct = h_0 + state[:, CASH_INDEX] + state[:, INVENTORY_INDEX] * state[:, ASSET_PRICE_INDEX]
+        return value_fct
 
 
 class CarteaJaimungalOeAgent(Agent):

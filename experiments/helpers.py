@@ -31,7 +31,7 @@ def get_cj_env(
 ):
     initial_price = 100
     n_steps = int(10 * terminal_time * arrival_rate)
-    step_size = 1 / n_steps
+    step_size = terminal_time / n_steps
     reward_function = CjMmCriterion(phi, alpha) if phi > 0 or alpha > 0 else PnL()
     midprice_model=BrownianMotionMidpriceModel(
             volatility=sigma,

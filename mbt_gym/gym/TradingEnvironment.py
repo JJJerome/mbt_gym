@@ -365,7 +365,7 @@ class TradingEnvironment(gym.Env):
         assert self.action_type in ACTION_TYPES
         for process in self.stochastic_processes.values():
             assert np.isclose(process.step_size, self.step_size, atol=0.0, rtol=0.01), (
-                f"{type(self.midprice_model).__name__}.step_size = {process.step_size}, "
+                f"{type(process).__name__}.step_size = {process.step_size}, "
                 + f" but env.step_size = {self.step_size}"
             )
             assert process.num_trajectories == self.num_trajectories, (

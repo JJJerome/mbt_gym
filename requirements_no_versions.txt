@@ -1,0 +1,19 @@
+# specific version of setuptools needed for gym 0.21
+# https://github.com/openai/gym/issues/3176
+# (it is not clear why it goes for gym 0.21 not e.g., 0.26.1)
+setuptools==65.5.0
+black
+flake8
+invoke
+jupyter
+jupyter_nbextensions_configurator
+matplotlib
+mypy
+numpy
+pandas
+seaborn
+stable_baselines3
+stochastic
+tensorboard
+torch
+gym

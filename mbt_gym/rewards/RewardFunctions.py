@@ -2,11 +2,7 @@ import abc
 from typing import Union
 
 import numpy as np
-
-CASH_INDEX = 0
-INVENTORY_INDEX = 1
-TIME_INDEX = 2
-ASSET_PRICE_INDEX = 3
+from mbt_gym.gym.index_names import CASH_INDEX, INVENTORY_INDEX, TIME_INDEX, ASSET_PRICE_INDEX
 
 
 class RewardFunction(metaclass=abc.ABCMeta):
@@ -46,13 +42,15 @@ class CjOeCriterion(RewardFunction):
         per_step_inventory_aversion: float = 0.01,
         terminal_inventory_aversion: float = 0.0,
         inventory_exponent: float = 2.0,
-        step_size: float = 1.0 / 200,
+        terminal_time: float = 1.0,
     ):
         self.per_step_inventory_aversion = per_step_inventory_aversion
         self.terminal_inventory_aversion = terminal_inventory_aversion
         self.pnl = PnL()
         self.inventory_exponent = inventory_exponent
-        self.step_size = step_size
+        self.terminal_time = terminal_time
+        self.initial_inventory = None
+        self.episode_length = None
 
     def calculate(
         self, current_state: np.ndarray, action: np.ndarray, next_state: np.ndarray, is_terminal_step: bool = False
@@ -61,15 +59,19 @@ class CjOeCriterion(RewardFunction):
         return (
             self.pnl.calculate(current_state, action, next_state, is_terminal_step)
             - dt * self.per_step_inventory_aversion * next_state[:, INVENTORY_INDEX] ** self.inventory_exponent
-            - self.inventory_exponent
-            * dt
+            - dt
             * self.terminal_inventory_aversion
-            * np.squeeze(action)
-            * (current_state[:, INVENTORY_INDEX]) ** (self.inventory_exponent - 1)
+            * (
+                self.inventory_exponent
+                * np.squeeze(action)
+                * (current_state[:, INVENTORY_INDEX]) ** (self.inventory_exponent - 1)
+                + self.initial_inventory**self.inventory_exponent * self.episode_length
+            )
         )
 
     def reset(self, initial_state: np.ndarray):
-        pass
+        self.initial_inventory = initial_state[:, INVENTORY_INDEX]
+        self.episode_length = self.terminal_time - initial_state[:, TIME_INDEX]
 
 
 class CjMmCriterion(RewardFunction):

@@ -16,7 +16,7 @@ from mbt_gym.rewards.RewardFunctions import CjMmCriterion, PnL
 from mbt_gym.stochastic_processes.arrival_models import PoissonArrivalModel
 from mbt_gym.stochastic_processes.fill_probability_models import ExponentialFillFunction
 from mbt_gym.stochastic_processes.midprice_models import BrownianMotionMidpriceModel
-
+from mbt_gym.gym.ModelDynamics import LimitAndMarketOrderModelDynamics
 
 def get_cj_env(
     num_trajectories: int = 1,
@@ -31,25 +31,27 @@ def get_cj_env(
 ):
     initial_price = 100
     n_steps = int(10 * terminal_time * arrival_rate)
-    step_size = 1 / n_steps
+    step_size = terminal_time / n_steps
     reward_function = CjMmCriterion(phi, alpha) if phi > 0 or alpha > 0 else PnL()
-    env_params = dict(
-        terminal_time=terminal_time,
-        n_steps=n_steps,
-        initial_inventory=initial_inventory,
-        midprice_model=BrownianMotionMidpriceModel(
+    midprice_model=BrownianMotionMidpriceModel(
             volatility=sigma,
             terminal_time=terminal_time,
             step_size=step_size,
             initial_price=initial_price,
             num_trajectories=num_trajectories,
-        ),
-        arrival_model=PoissonArrivalModel(
-            intensity=np.array([arrival_rate, arrival_rate]), step_size=step_size, num_trajectories=num_trajectories
-        ),
-        fill_probability_model=ExponentialFillFunction(
-            fill_exponent=fill_exponent, step_size=step_size, num_trajectories=num_trajectories
-        ),
+        )
+    arrival_model=PoissonArrivalModel(
+        intensity=np.array([arrival_rate, arrival_rate]), step_size=step_size, num_trajectories=num_trajectories
+    )
+    fill_probability_model=ExponentialFillFunction(
+        fill_exponent=fill_exponent, step_size=step_size, num_trajectories=num_trajectories
+    )
+    env_params = dict(
+        terminal_time=terminal_time,
+        n_steps=n_steps,
+        model_dynamics = LimitAndMarketOrderModelDynamics(midprice_model = midprice_model, arrival_model= arrival_model, fill_probability_model = fill_probability_model, 
+                                                          num_trajectories = num_trajectories),
+        initial_inventory=initial_inventory,
         reward_function=reward_function,
         max_inventory=n_steps,
         num_trajectories=num_trajectories,
@@ -104,7 +106,7 @@ def get_experiment_string(env):
         + f"phi_{phi}__"
         + f"alpha_{alpha}__"
         + f"initial_inventory_{env.initial_inventory}__"
-        + f"random_start_{env.random_start}"
+        + f"random_start_{env.start_time}"
     )
 
 
@@ -136,19 +138,19 @@ def create_inventory_plot(
             action = normalised_env.normalise_action(action, inverse=True)
         bid_action, ask_action = action
         cj_bid_action, cj_ask_action = cj_agent.get_action(state).reshape(-1)
-        
+
         if inventory == min_inventory:
             ask_action = np.NaN
             cj_ask_action = np.NaN
         if inventory == max_inventory:
             bid_action = np.NaN
             cj_bid_action = np.NaN
-        
+
         bid_actions.append(bid_action)
         ask_actions.append(ask_action)
         cj_bid_actions.append(cj_bid_action)
         cj_ask_actions.append(cj_ask_action)
-        
+
     plt.plot(inventories, bid_actions, label="bid", color="k")
     plt.plot(inventories, ask_actions, label="ask", color="r")
     plt.plot(inventories, cj_bid_actions, label="bid cj", color="k", linestyle="--")
@@ -175,7 +177,7 @@ def create_time_plot(
         normalised_env = StableBaselinesTradingEnvironment(ReduceStateSizeWrapper(env, reduced_training_indices))
     assert env.num_trajectories == 1, "Plotting actions must be done with a single trajectory env"
     ppo_agent = SbAgent(model)
-    cj_agent = CarteaJaimungalMmAgent(env=env, max_inventory = max_inventory)
+    cj_agent = CarteaJaimungalMmAgent(env=env, max_inventory=max_inventory)
     inventories = np.arange(min_inventory, max_inventory + 1, 1)
     times = np.arange(0, env.terminal_time + 0.01, 0.01)
     inventory_dict = {inventory: [] for inventory in inventories}
@@ -195,19 +197,18 @@ def create_time_plot(
             if model_uses_normalisation:
                 action = normalised_env.normalise_action(action, inverse=True)
             bid_action, ask_action = action
-            
+
             cj_actions = cj_agent.get_action(state)
-            cj_bid_action = cj_actions[0,0]
-            cj_ask_action = cj_actions[0,1]
-            
-            
+            cj_bid_action = cj_actions[0, 0]
+            cj_ask_action = cj_actions[0, 1]
+
             if inventory == min_inventory:
                 ask_action = np.NaN
                 cj_ask_action = np.NaN
             if inventory == max_inventory:
                 bid_action = np.NaN
                 cj_bid_action = np.NaN
-            
+
             action_dict["rl bid actions"][inventory].append(bid_action)
             action_dict["rl ask actions"][inventory].append(ask_action)
             action_dict["cj bid actions"][inventory].append(cj_bid_action)

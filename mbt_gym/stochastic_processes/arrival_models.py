@@ -48,7 +48,7 @@ class PoissonArrivalModel(ArrivalModel):
             seed=seed,
         )
 
-    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray):
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray, state: np.ndarray = None):
         pass
 
     def get_arrivals(self) -> np.ndarray:
@@ -80,7 +80,7 @@ class HawkesArrivalModel(ArrivalModel):
             seed=seed,
         )
 
-    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray) -> np.ndarray:
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray, state: np.ndarray = None) -> np.ndarray:
         self.current_state = (
             self.current_state
             + self.mean_reversion_speed

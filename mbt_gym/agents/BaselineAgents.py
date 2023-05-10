@@ -6,10 +6,11 @@ import warnings
 from scipy.linalg import expm
 
 from mbt_gym.agents.Agent import Agent
-from mbt_gym.gym.TradingEnvironment import TradingEnvironment, INVENTORY_INDEX, TIME_INDEX, BID_INDEX, ASK_INDEX
+from mbt_gym.gym.TradingEnvironment import TradingEnvironment
+from mbt_gym.gym.index_names import INVENTORY_INDEX, TIME_INDEX, ASSET_PRICE_INDEX, CASH_INDEX, BID_INDEX, ASK_INDEX
 from mbt_gym.rewards.RewardFunctions import CjMmCriterion, PnL
 from mbt_gym.stochastic_processes.price_impact_models import PriceImpactModel, TemporaryAndPermanentPriceImpact
-
+from mbt_gym.gym.ModelDynamics import LimitOrderModelDynamics, TradinghWithSpeedModelDynamics
 
 class RandomAgent(Agent):
     def __init__(self, env: gym.Env, seed: int = None):
@@ -54,13 +55,13 @@ class AvellanedaStoikovAgent(Agent):
         self.env = env or TradingEnvironment()
         assert isinstance(self.env, TradingEnvironment)
         self.terminal_time = self.env.terminal_time
-        self.volatility = self.env.midprice_model.volatility
-        self.rate_of_arrival = self.env.arrival_model.intensity
-        self.fill_exponent = self.env.fill_probability_model.fill_exponent
+        self.volatility = self.env.model_dynamics.midprice_model.volatility
+        self.rate_of_arrival = self.env.model_dynamics.arrival_model.intensity
+        self.fill_exponent = self.env.model_dynamics.fill_probability_model.fill_exponent
 
     def get_action(self, state: np.ndarray):
-        inventory = state[:, 1]
-        time = state[:, 2]
+        inventory = state[:, INVENTORY_INDEX]
+        time = state[:, TIME_INDEX]
         action = self._get_action(inventory, time)
         if action.min() < 0:
             warnings.warn("Avellaneda-Stoikov agent is quoting a negative spread")
@@ -89,9 +90,9 @@ class CarteaJaimungalMmAgent(Agent):
         max_inventory: int = 100,
     ):
         self.env = env or TradingEnvironment()
-        assert self.env.action_type == "limit"
+        assert isinstance(self.env.model_dynamics, LimitOrderModelDynamics), "Trader must be type LimitOrderTrader"
         assert isinstance(self.env.reward_function, (CjMmCriterion, PnL)), "Reward function for CjMmAgent is incorrect."
-        self.kappa = self.env.fill_probability_model.fill_exponent
+        self.kappa = self.env.model_dynamics.fill_probability_model.fill_exponent
         self.num_trajectories = self.env.num_trajectories
         if isinstance(self.env.reward_function, PnL):
             self.inventory_neutral = True
@@ -102,7 +103,7 @@ class CarteaJaimungalMmAgent(Agent):
             self.alpha = env.reward_function.terminal_inventory_aversion
             assert self.env.reward_function.inventory_exponent == 2.0, "Inventory exponent must be = 2."
             self.terminal_time = self.env.terminal_time
-            self.lambdas = self.env.arrival_model.intensity
+            self.lambdas = self.env.model_dynamics.arrival_model.intensity
             self.max_inventory = max_inventory
             self.a_matrix, self.z_vector = self._calculate_a_and_z()
             self.large_depth = 10_000
@@ -153,10 +154,21 @@ class CarteaJaimungalMmAgent(Agent):
             Amatrix[i, i] = -self.phi * self.kappa * inventory**2
             z_vector[i, 0] = np.exp(-self.alpha * self.kappa * inventory**2)
             if i + 1 < matrix_size:
-                Amatrix[i, i + 1] = self.lambdas[0] * np.exp(-1)
+                Amatrix[i, i + 1] = self.lambdas[BID_INDEX] * np.exp(-1)
             if i > 0:
-                Amatrix[i, i - 1] = self.lambdas[1] * np.exp(-1)
+                Amatrix[i, i - 1] = self.lambdas[ASK_INDEX] * np.exp(-1)
         return Amatrix, z_vector
+    
+    def calculate_true_value_function(self, state: np.ndarray):
+        current_time = state[0, TIME_INDEX]
+        inventories = state[:, INVENTORY_INDEX]
+        value_fct = np.zeros(shape=(self.num_trajectories, 1))
+        h_t = self._calculate_ht(current_time)
+        indices = np.clip(self.max_inventory + inventories, 0, 2 * self.max_inventory)
+        indices = indices.astype(int)
+        h_0 = h_t[indices]
+        value_fct = h_0 + state[:, CASH_INDEX] + state[:, INVENTORY_INDEX] * state[:, ASSET_PRICE_INDEX]
+        return value_fct
 
 
 class CarteaJaimungalOeAgent(Agent):
@@ -169,8 +181,8 @@ class CarteaJaimungalOeAgent(Agent):
         self.phi = phi
         self.alpha = alpha
         self.env = env or TradingEnvironment()
-        self.price_impact_model = env.price_impact_model
-        assert self.env.action_type == "speed"
+        self.price_impact_model = env.model_dynamics.price_impact_model
+        assert isinstance(self.env.model_dynamics, TradinghWithSpeedModelDynamics), "Trader must be type TradinghWithSpeedTrader"
         self.terminal_time = self.env.terminal_time
         self.temporary_price_impact = self.price_impact_model.temporary_impact_coefficient
         self.permanent_price_impact = self.price_impact_model.permanent_impact_coefficient
@@ -182,8 +194,9 @@ class CarteaJaimungalOeAgent(Agent):
         # Algorithmic and High-Frequency Trading
         # Cambridge University Press
         gamma = np.sqrt(self.phi / self.temporary_price_impact)
-        zeta = self.alpha - 0.5 * self.permanent_price_impact + np.sqrt(self.temporary_price_impact * self.phi)
-        zeta /= self.alpha - 0.5 * self.permanent_price_impact - np.sqrt(self.temporary_price_impact * self.phi)
+        zeta = (self.alpha - 0.5 * self.permanent_price_impact + np.sqrt(self.temporary_price_impact * self.phi)) / (
+            self.alpha - 0.5 * self.permanent_price_impact - np.sqrt(self.temporary_price_impact * self.phi)
+        )
         initial_inventory = self.env.initial_inventory
 
         time_left = self.terminal_time - state[0, TIME_INDEX]

@@ -125,7 +125,7 @@ def create_inventory_plot(
         normalised_env = StableBaselinesTradingEnvironment(ReduceStateSizeWrapper(env, reduced_training_indices))
     assert env.num_trajectories == 1, "Plotting actions must be done with a single trajectory env"
     ppo_agent = SbAgent(model)
-    cj_agent = CarteaJaimungalMmAgent(env=env, max_inventory=max_inventory)
+    cj_agent = CarteaJaimungalMmAgent(env=env)
     inventories = np.arange(min_inventory, max_inventory + 1, 1)
     bid_actions, ask_actions, cj_bid_actions, cj_ask_actions = [], [], [], []
     for inventory in inventories:
@@ -177,7 +177,7 @@ def create_time_plot(
         normalised_env = StableBaselinesTradingEnvironment(ReduceStateSizeWrapper(env, reduced_training_indices))
     assert env.num_trajectories == 1, "Plotting actions must be done with a single trajectory env"
     ppo_agent = SbAgent(model)
-    cj_agent = CarteaJaimungalMmAgent(env=env, max_inventory=max_inventory)
+    cj_agent = CarteaJaimungalMmAgent(env=env)
     inventories = np.arange(min_inventory, max_inventory + 1, 1)
     times = np.arange(0, env.terminal_time + 0.01, 0.01)
     inventory_dict = {inventory: [] for inventory in inventories}

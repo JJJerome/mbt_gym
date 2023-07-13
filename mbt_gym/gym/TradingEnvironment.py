@@ -47,16 +47,20 @@ class TradingEnvironment(gym.Env):
         self.terminal_time = terminal_time
         self.n_steps = n_steps
         self._step_size = self.terminal_time / self.n_steps
-        self.reward_function = reward_function or PnL()        
+        self.reward_function = reward_function or PnL()
         self.model_dynamics = model_dynamics or LimitOrderModelDynamics(
-            midprice_model = BrownianMotionMidpriceModel(
-                step_size=self._step_size, num_trajectories=num_trajectories, seed= seed), 
-            arrival_model = PoissonArrivalModel(
-                intensity = np.array([100, 100]), step_size= self._step_size, 
-                num_trajectories=num_trajectories, seed = seed), 
-            fill_probability_model = ExponentialFillFunction(
-                step_size= self._step_size, num_trajectories=num_trajectories, seed = seed), 
-            num_trajectories = num_trajectories, seed = seed)
+            midprice_model=BrownianMotionMidpriceModel(
+                step_size=self._step_size, num_trajectories=num_trajectories, seed=seed
+            ),
+            arrival_model=PoissonArrivalModel(
+                intensity=np.array([100, 100]), step_size=self._step_size, num_trajectories=num_trajectories, seed=seed
+            ),
+            fill_probability_model=ExponentialFillFunction(
+                step_size=self._step_size, num_trajectories=num_trajectories, seed=seed
+            ),
+            num_trajectories=num_trajectories,
+            seed=seed,
+        )
         self.stochastic_processes = self._get_stochastic_processes()
         self.stochastic_process_indices = self._get_stochastic_process_indices()
         self.num_trajectories = num_trajectories
@@ -97,19 +101,12 @@ class TradingEnvironment(gym.Env):
         return self.normalise_observation(self.model_dynamics.state.copy())
 
     def step(self, action: np.ndarray):
-        if action.shape != (self.num_trajectories, self.action_space.shape[0]):
-            action = action.reshape(self.num_trajectories, self.action_space.shape[0])
         action = self.normalise_action(action, inverse=True)
         current_state = self.model_dynamics.state.copy()
         next_state = self._update_state(action)
-        done = self.model_dynamics.state[0, TIME_INDEX] >= self.terminal_time - self.step_size / 2
-        dones = np.full((self.num_trajectories,), done, dtype=bool)
-        rewards = self.reward_function.calculate(current_state, action, next_state, done)
-        infos = (
-            self.info_calculator.calculate(current_state, action, rewards)
-            if self.info_calculator is not None
-            else self._empty_infos
-        )
+        dones = self._get_dones()
+        rewards = self.reward_function.calculate(current_state, action, next_state, dones[0])
+        infos = self._calculate_infos(current_state, action, rewards)
         return self.normalise_observation(next_state.copy()), self.normalise_rewards(rewards), dones, infos
 
     def normalise_observation(self, obs: np.ndarray, inverse: bool = False):
@@ -172,7 +169,7 @@ class TradingEnvironment(gym.Env):
         return self._num_trajectories
 
     @num_trajectories.setter
-    def num_trajectories(self, num_trajectories: float):
+    def num_trajectories(self, num_trajectories: int):
         self._num_trajectories = num_trajectories
         for process_name, process in self.stochastic_processes.items():
             if process.num_trajectories != num_trajectories:
@@ -217,6 +214,17 @@ class TradingEnvironment(gym.Env):
         self.model_dynamics.update_state(arrivals, fills, action)
         self._clip_inventory_and_cash()
         self.model_dynamics.state[:, TIME_INDEX] += self.step_size
+
+    def _get_dones(self):
+        done = self.model_dynamics.state[0, TIME_INDEX] >= self.terminal_time - self.step_size / 2
+        return np.full((self.num_trajectories,), done, dtype=bool)
+
+    def _calculate_infos(self, current_state, action, rewards):
+        return (
+            self.info_calculator.calculate(current_state, action, rewards)
+            if self.info_calculator is not None
+            else self._empty_infos
+        )
 
     def _get_max_cash(self) -> float:
         return self.n_steps * self.max_stock_price  # TODO: make this a tighter bound
@@ -276,7 +284,9 @@ class TradingEnvironment(gym.Env):
         self.model_dynamics.state[:, INVENTORY_INDEX] = self._clip(
             self.model_dynamics.state[:, INVENTORY_INDEX], -self.max_inventory, self.max_inventory, cash_flag=False
         )
-        self.model_dynamics.state[:, CASH_INDEX] = self._clip(self.model_dynamics.state[:, CASH_INDEX], -self.max_cash, self.max_cash, cash_flag=True)
+        self.model_dynamics.state[:, CASH_INDEX] = self._clip(
+            self.model_dynamics.state[:, CASH_INDEX], -self.max_cash, self.max_cash, cash_flag=True
+        )
 
     def _clip(self, not_clipped: float, min: float, max: float, cash_flag: bool) -> float:
         clipped = np.clip(not_clipped, min, max)

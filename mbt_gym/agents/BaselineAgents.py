@@ -87,7 +87,6 @@ class CarteaJaimungalMmAgent(Agent):
     def __init__(
         self,
         env: TradingEnvironment = None,
-        max_inventory: int = 100,
     ):
         self.env = env or TradingEnvironment()
         assert isinstance(self.env.model_dynamics, LimitOrderModelDynamics), "Trader must be type LimitOrderTrader"
@@ -104,7 +103,7 @@ class CarteaJaimungalMmAgent(Agent):
             assert self.env.reward_function.inventory_exponent == 2.0, "Inventory exponent must be = 2."
             self.terminal_time = self.env.terminal_time
             self.lambdas = self.env.model_dynamics.arrival_model.intensity
-            self.max_inventory = max_inventory
+            self.max_inventory = env.max_inventory
             self.a_matrix, self.z_vector = self._calculate_a_and_z()
             self.large_depth = 10_000
 

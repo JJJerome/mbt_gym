@@ -131,7 +131,7 @@ class TemporaryAndTransientPriceImpact(PriceImpactModel):
                               + self.linear_kernel_coefficient * actions * self.step_size)
 
     def get_impact(self, action) -> np.ndarray:
-        return self.temporary_impact_coefficient * action + self.self.transient_impact_coefficient * self.current_state
+        return self.temporary_impact_coefficient * action + self.transient_impact_coefficient * self.current_state
 
     @property
     def max_speed(self) -> float:
@@ -172,7 +172,7 @@ class TransientPriceImpact(PriceImpactModel):
                               + self.linear_kernel_coefficient * actions * self.step_size)
 
     def get_impact(self, action) -> np.ndarray:
-        return self.self.transient_impact_coefficient * self.current_state
+        return self.transient_impact_coefficient * self.current_state
 
     @property
     def max_speed(self) -> float:

@@ -7,8 +7,7 @@ import numpy as np
 from numpy.random import default_rng
 
 
-from mbt_gym.gym.index_names import CASH_INDEX, INVENTORY_INDEX, BID_INDEX, ASK_INDEX
-
+from mbt_gym.gym.index_names import CASH_INDEX, INVENTORY_INDEX, TIME_INDEX, BID_INDEX, ASK_INDEX
 from mbt_gym.stochastic_processes.arrival_models import ArrivalModel
 from mbt_gym.stochastic_processes.fill_probability_models import FillProbabilityModel
 from mbt_gym.stochastic_processes.midprice_models import MidpriceModel
@@ -36,41 +35,32 @@ class ModelDynamics(metaclass=abc.ABCMeta):
         self.round_initial_inventory = False
         self.required_processes = self.get_required_stochastic_processes()
         self._check_processes_are_not_none(self.required_processes)
+        self.stochastic_processes = self._get_stochastic_processes()
+        self.stochastic_process_indices = self._get_stochastic_process_indices()
         self.state = None
 
-    def update_state(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
+    @abc.abstractmethod
+    def update_state(self, action: np.ndarray):
         pass
-    
-    def get_fills(self, action: np.ndarray):
-        pass
-    
-    def get_arrivals_and_fills(self, action: np.ndarray):
-        return None, None 
 
-    def _limit_depths(self, action: np.ndarray):
-        return action[:, 0:2]
-
+    @abc.abstractmethod
     def get_action_space(self) -> gym.spaces.Space:
         pass
-    
+
+    @abc.abstractmethod
     def get_required_stochastic_processes(self):
         pass
-    
-    def _get_max_depth(self) -> Optional[float]:
-        if self.fill_probability_model is not None:
-            return self.fill_probability_model.max_depth
-        else:
-            return None
 
-    def _get_max_speed(self) -> float:
-        if self.price_impact_model is not None:
-            return self.price_impact_model.max_speed
-        else:
-            return None
+    @property
+    def midprice(self):
+        return self.midprice_model.current_state[:, 0].reshape(-1, 1)  # TODO: remove?
 
-    def _get_fill_multiplier(self):
-        ones = np.ones((self.num_trajectories, 1))
-        return np.append(-ones, ones, axis=1)
+    def _update_market_state(self, **kwargs):
+        for process_name, process in self.stochastic_processes.items():
+            process.update(**kwargs)
+            lower_index = self.stochastic_process_indices[process_name][0]
+            upper_index = self.stochastic_process_indices[process_name][1]
+            self.state[:, lower_index:upper_index] = process.current_state
 
     def _check_processes_are_not_none(self, processes):
         for process in processes:
@@ -79,9 +69,38 @@ class ModelDynamics(metaclass=abc.ABCMeta):
     def _check_process_is_not_none(self, process: str):
         assert getattr(self, process) is not None, f"This model dynamics cannot have env.{process} to be None."
 
-    @property
-    def midprice(self):
-        return self.midprice_model.current_state[:, 0].reshape(-1, 1)
+    def _get_stochastic_processes(self):
+        stochastic_processes = dict()
+        for process_name in ["midprice_model", "arrival_model", "fill_probability_model", "price_impact_model"]:
+            process: StochasticProcessModel = getattr(self.model_dynamics, process_name)
+            if process is not None:
+                stochastic_processes[process_name] = process
+        return OrderedDict(stochastic_processes)
+
+    def _get_stochastic_process_indices(self):
+        process_indices = dict()
+        count = 3
+        for process_name, process in self.stochastic_processes.items():
+            dimension = int(process.initial_vector_state.shape[1])
+            process_indices[process_name] = (count, count + dimension)
+            count += dimension
+        return OrderedDict(process_indices)
+
+    def _clip_inventory_and_cash(self):
+        self.state[:, INVENTORY_INDEX] = self._clip(
+            self.state[:, INVENTORY_INDEX], -self.max_inventory, self.max_inventory, cash_flag=False
+        )
+        self.state[:, CASH_INDEX] = self._clip(
+            self.state[:, CASH_INDEX], -self.max_cash, self.max_cash, cash_flag=True
+        )
+
+    def _clip(self, not_clipped: float, min: float, max: float, cash_flag: bool) -> float:
+        clipped = np.clip(not_clipped, min, max)
+        if (not_clipped != clipped).any() and cash_flag:
+            print(f"Clipping agent's cash from {not_clipped} to {clipped}.")
+        if (not_clipped != clipped).any() and not cash_flag:
+            print(f"Clipping agent's inventory from {not_clipped} to {clipped}.")
+        return clipped
 
 
 class LimitOrderModelDynamics(ModelDynamics):
@@ -105,15 +124,25 @@ class LimitOrderModelDynamics(ModelDynamics):
         self._check_processes_are_not_none(self.required_processes)
         self.round_initial_inventory = True
         
-    def update_state(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
+    def update_state(self, action: np.ndarray):
+        arrivals, fills = self.get_arrivals_and_fills(action)
+        if fills is not None:
+            fills = self._remove_max_inventory_fills(fills)
+        self._update_agent_state(arrivals, fills, action)
+        self._update_market_state(arrivals, fills, action)
+        return self.model_dynamics.state
+
+    def _update_agent_state(self, arrivals: np.ndarray, fills: np.ndarray, action: np.ndarray):
         self.state[:, INVENTORY_INDEX] += np.sum(arrivals * fills * -self.fill_multiplier, axis=1)
         self.state[:, CASH_INDEX] += np.sum(
-                self.fill_multiplier
-                * arrivals
-                * fills
-                * (self.midprice + self._limit_depths(action) * self.fill_multiplier),
-                axis=1,
-            )
+            self.fill_multiplier
+            * arrivals
+            * fills
+            * (self.midprice + self._limit_depths(action) * self.fill_multiplier),
+            axis=1,
+        )
+        self._clip_inventory_and_cash()
+        self.state[:, TIME_INDEX] += self.step_size
 
     def get_action_space(self) -> gym.spaces.Space:
         assert self.max_depth is not None, "For limit orders max_depth cannot be None."
@@ -129,6 +158,22 @@ class LimitOrderModelDynamics(ModelDynamics):
         depths = self._limit_depths(action)
         fills = self.fill_probability_model.get_fills(depths)
         return arrivals, fills
+
+    def _remove_max_inventory_fills(self, fills: np.ndarray) -> np.ndarray:
+        fill_multiplier = np.concatenate(
+            ((1 - self.is_at_max_inventory).reshape(-1, 1), (1 - self.is_at_min_inventory).reshape(-1, 1)), axis=1
+        )
+        return fill_multiplier * fills
+
+    def _get_max_depth(self) -> Optional[float]:
+        if self.fill_probability_model is not None:
+            return self.fill_probability_model.max_depth
+        else:
+            return None
+
+    def _get_fill_multiplier(self):
+        ones = np.ones((self.num_trajectories, 1))
+        return np.append(-ones, ones, axis=1)
 
 
 class AtTheTouchModelDynamics(ModelDynamics):
@@ -239,6 +284,9 @@ class LimitAndMarketOrderModelDynamics(ModelDynamics):
         fills = self.fill_probability_model.get_fills(depths)
         return arrivals, fills
 
+    def _limit_depths(self, action: np.ndarray):
+        return action[:, 0:2]
+
 
 class TradinghWithSpeedModelDynamics(ModelDynamics):
     """ModelDynamics for 'speed'."""
@@ -273,3 +321,9 @@ class TradinghWithSpeedModelDynamics(ModelDynamics):
     def get_required_stochastic_processes(self):
         processes = ["price_impact_model"]
         return processes
+
+    def _get_max_speed(self) -> float:
+        if self.price_impact_model is not None:
+            return self.price_impact_model.max_speed
+        else:
+            return None

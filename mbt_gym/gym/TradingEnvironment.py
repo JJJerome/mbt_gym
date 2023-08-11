@@ -61,8 +61,6 @@ class TradingEnvironment(gym.Env):
             num_trajectories=num_trajectories,
             seed=seed,
         )
-        self.stochastic_processes = self._get_stochastic_processes()
-        self.stochastic_process_indices = self._get_stochastic_process_indices()
         self.num_trajectories = num_trajectories
         self.initial_cash = initial_cash
         self.initial_inventory = initial_inventory
@@ -103,6 +101,9 @@ class TradingEnvironment(gym.Env):
     def step(self, action: np.ndarray):
         action = self.normalise_action(action, inverse=True)
         current_state = self.model_dynamics.state.copy()
+        next_state = self.model_dynamics.update_state(action)
+
+
         next_state = self._update_state(action)
         dones = self._get_dones()
         rewards = self.reward_function.calculate(current_state, action, next_state, dones[0])
@@ -280,21 +281,6 @@ class TradingEnvironment(gym.Env):
         else:
             raise Exception("Initial inventory must be a tuple of length 2 or an int.")
 
-    def _clip_inventory_and_cash(self):
-        self.model_dynamics.state[:, INVENTORY_INDEX] = self._clip(
-            self.model_dynamics.state[:, INVENTORY_INDEX], -self.max_inventory, self.max_inventory, cash_flag=False
-        )
-        self.model_dynamics.state[:, CASH_INDEX] = self._clip(
-            self.model_dynamics.state[:, CASH_INDEX], -self.max_cash, self.max_cash, cash_flag=True
-        )
-
-    def _clip(self, not_clipped: float, min: float, max: float, cash_flag: bool) -> float:
-        clipped = np.clip(not_clipped, min, max)
-        if (not_clipped != clipped).any() and cash_flag:
-            print(f"Clipping agent's cash from {not_clipped} to {clipped}.")
-        if (not_clipped != clipped).any() and not cash_flag:
-            print(f"Clipping agent's inventory from {not_clipped} to {clipped}.")
-        return clipped
 
     @staticmethod
     def _clamp(probability):

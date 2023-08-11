@@ -167,4 +167,4 @@ class ExogenousMmFillProbabilityModel(FillProbabilityModel):
 
     def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray, state: np.ndarray = None):
         for process in self.exogenous_best_depth_processes:
-            process.update(arrivals, fills, actions)
+            process.update(arrivals=arrivals, fills=fills, actions=actions)

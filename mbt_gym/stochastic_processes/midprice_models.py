@@ -29,7 +29,7 @@ class ConstantMidpriceModel(MidpriceModel):
             seed=seed,
         )
 
-    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray, state: np.ndarray = None) -> np.ndarray:
+    def update(self, **kwargs) -> np.ndarray:
         pass
 
 
@@ -57,7 +57,7 @@ class BrownianMotionMidpriceModel(MidpriceModel):
             seed=seed,
         )
 
-    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray, state: np.ndarray = None) -> np.ndarray:
+    def update(self, **kwargs) -> None:
         self.current_state = (
             self.current_state
             + self.drift * self.step_size * np.ones((self.num_trajectories, 1))
@@ -92,7 +92,7 @@ class GeometricBrownianMotionMidpriceModel(MidpriceModel):
             seed=seed,
         )
 
-    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray, state: np.ndarray = None) -> np.ndarray:
+    def update(self, **kwargs) -> None:
         self.current_state = (
             self.current_state
             + self.drift * self.current_state * self.step_size

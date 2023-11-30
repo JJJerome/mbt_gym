@@ -94,3 +94,88 @@ class TemporaryAndPermanentPriceImpact(PriceImpactModel):
     @property
     def max_speed(self) -> float:
         return 10.0  # TODO: link to asset price perhaps?
+
+
+class TemporaryAndTransientPriceImpact(PriceImpactModel):
+    def __init__(
+        self,
+        temporary_impact_coefficient: float = 0.01,
+        transient_impact_coefficient: float = 0.01, # kappa in Neuman-Voß (2022)
+        resilience_coefficient: float = 0.01, # rho in Neuman-Voß (2022)
+        initial_transient_impact: float = 0.01, # y in Neuman-Voß (2022)
+        linear_kernel_coefficient: float = 0.01, # gamma in Neuman-Voß (2022)
+        n_steps: int = 20 * 10,
+        terminal_time: float = 1.0,
+        num_trajectories: int = 1,
+    ):
+        self.temporary_impact_coefficient = temporary_impact_coefficient
+        self.transient_impact_coefficient = transient_impact_coefficient
+        self.resilience_coefficient = resilience_coefficient
+        self.initial_transient_impact = initial_transient_impact
+        self.linear_kernel_coefficient = linear_kernel_coefficient
+        self.n_steps = n_steps
+        self.terminal_time = terminal_time
+        self.step_size = self.terminal_time / self.n_steps
+        super().__init__(
+            min_value=np.array([[-self.max_speed * self.terminal_time * self.transient_impact_coefficient]]),
+            max_value=np.array([[self.max_speed * self.terminal_time * self.transient_impact_coefficient]]),
+            step_size=self.step_size,
+            terminal_time=0.0,
+            initial_state=np.array([[self.initial_transient_impact]]),
+            num_trajectories=num_trajectories,
+            seed=None,
+        )
+
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray, state: np.ndarray = None):
+        self.current_state = (self.current_state - self.resilience_coefficient * self.current_state * self.step_size
+                              + self.linear_kernel_coefficient * actions * self.step_size)
+
+    def get_impact(self, action) -> np.ndarray:
+        return self.temporary_impact_coefficient * action + self.transient_impact_coefficient * self.current_state
+
+    @property
+    def max_speed(self) -> float:
+        return 10.0  # TODO: link to asset price
+
+
+
+class TransientPriceImpact(PriceImpactModel):
+    def __init__(
+        self,
+        transient_impact_coefficient: float = 0.01, # kappa in Neuman-Voß (2022)
+        resilience_coefficient: float = 0.01, # rho in Neuman-Voß (2022)
+        initial_transient_impact: float = 0.01, # y in Neuman-Voß (2022)
+        linear_kernel_coefficient: float = 0.01, # gamma in Neuman-Voß (2022)
+        n_steps: int = 20 * 10,
+        terminal_time: float = 1.0,
+        num_trajectories: int = 1,
+    ):
+        self.transient_impact_coefficient = transient_impact_coefficient
+        self.resilience_coefficient = resilience_coefficient
+        self.initial_transient_impact = initial_transient_impact
+        self.linear_kernel_coefficient = linear_kernel_coefficient
+        self.n_steps = n_steps
+        self.terminal_time = terminal_time
+        self.step_size = self.terminal_time / self.n_steps
+        super().__init__(
+            min_value=np.array([[-self.max_speed * self.terminal_time * self.transient_impact_coefficient]]),
+            max_value=np.array([[self.max_speed * self.terminal_time * self.transient_impact_coefficient]]),
+            step_size=self.step_size,
+            terminal_time=0.0,
+            initial_state=np.array([[self.initial_transient_impact]]),
+            num_trajectories=num_trajectories,
+            seed=None,
+        )
+
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray, state: np.ndarray = None):
+        self.current_state = (self.current_state - self.resilience_coefficient * self.current_state * self.step_size
+                              + self.linear_kernel_coefficient * actions * self.step_size)
+
+    def get_impact(self, action) -> np.ndarray:
+        return self.transient_impact_coefficient * self.current_state
+
+    @property
+    def max_speed(self) -> float:
+        return 10.0  # TODO: link to asset price
+
+

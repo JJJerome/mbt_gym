@@ -56,6 +56,33 @@ class PoissonArrivalModel(ArrivalModel):
         return unif < self.intensity * self.step_size
 
 
+class PoissonArrivalNonLinearModel(ArrivalModel):
+    def __init__(
+        self,
+        intensity: np.ndarray = np.array([140.0, 140.0]),
+        step_size: float = 0.001,
+        num_trajectories: int = 1,
+        seed: Optional[int] = None,
+    ):
+        self.intensity = np.array(intensity)
+        super().__init__(
+            min_value=np.array([[]]),
+            max_value=np.array([[]]),
+            step_size=step_size,
+            terminal_time=0.0,
+            initial_state=np.array([[]]),
+            num_trajectories=num_trajectories,
+            seed=seed,
+        )
+
+    def update(self, arrivals: np.ndarray, fills: np.ndarray, actions: np.ndarray, state: np.ndarray = None):
+        pass
+
+    def get_arrivals(self) -> np.ndarray:
+        unif = self.rng.uniform(size=(self.num_trajectories, 2))
+        return unif < 1. - np.exp(-self.intensity * self.step_size)
+
+
 class HawkesArrivalModel(ArrivalModel):
     def __init__(
         self,

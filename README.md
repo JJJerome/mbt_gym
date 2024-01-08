@@ -3,7 +3,7 @@
 
 It includes gym environments for popular analytically tractable market making models, as well as more complex models that prove difficult to solve analytically.
 
-The associated paper can be found at https://arxiv.org/abs/2209.07823.
+The associated paper can be found at https://dl.acm.org/doi/pdf/10.1145/3604237.3626873 and https://arxiv.org/abs/2209.07823.
 
 ## Contributions are welcome!
 If you wish to contribute to this repository, please read the details of how to do so in the 
@@ -43,13 +43,22 @@ sh exec_mbt_gym.sh
 
 ## Citing mbt_gym
 
-When using `mbt_gym`, please cite [the original workshop paper](https://arxiv.org/abs/2209.07823) by using the following
+When using `mbt_gym`, please cite our [ACM ICAIF 2023 paper](https://arxiv.org/abs/2209.07823) by using the following
 BibTeX entry:
 ```
-@article{jerome2022model,
-  title={Model-based gym environments for limit order book trading},
-  author={Jerome, Joseph and Sanchez-Betancourt, Leandro and Savani, Rahul and Herdegen, Martin},
-  journal={arXiv preprint arXiv:2209.07823},
-  year={2022}
+@inproceedings{JeromeSSH23,
+  author       = {Joseph Jerome and
+                  Leandro S{\'{a}}nchez{-}Betancourt and
+                  Rahul Savani and
+                  Martin Herdegen},
+  title        = {Mbt-gym: Reinforcement learning for model-based limit order book trading},
+  booktitle    = {4th {ACM} International Conference on {AI} in Finance, {ICAIF} 2023,
+                  Brooklyn, NY, USA, November 27-29, 2023},
+  pages        = {619--627},
+  publisher    = {{ACM}},
+  year         = {2023},
+  url          = {https://doi.org/10.1145/3604237.3626873},
+  doi          = {10.1145/3604237.3626873},
+  note         = {arXiv preprint arXiv:2209.07823}
 }
 ```
